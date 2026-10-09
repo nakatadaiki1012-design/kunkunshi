@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { HelpCircle, Keyboard, Music2, Info } from 'lucide-react';
+import { HelpCircle, Keyboard, Info, X } from 'lucide-react';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -15,82 +15,59 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-3xl rounded-2xl bg-stone-50 border border-stone-300 shadow-2xl p-6 overflow-y-auto max-h-[90vh]">
-        <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs select-none">
+      <div className="w-full max-w-2xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100 overflow-y-auto max-h-[90vh]">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-indigo-700" />
-            <h2 className="text-xl font-bold font-score text-stone-900">操作ヘルプ・ショートカット一覧</h2>
+            <HelpCircle className="h-5 w-5 text-amber-400" />
+            <h2 className="text-xl font-bold font-serif text-slate-100">工工四（クンクンシー）操作ヘルプ</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-200 hover:text-stone-700 cursor-pointer"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white cursor-pointer"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="mt-5 space-y-6 text-sm text-stone-700">
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <h3 className="font-bold text-stone-900 flex items-center gap-1.5 mb-2 font-score">
-              <Info className="h-4 w-4 text-amber-700" /> 箏文化譜の読み方と基本操作
+        <div className="mt-5 space-y-6 text-xs text-slate-300">
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="font-bold text-amber-400 flex items-center gap-1.5 mb-2 font-serif text-sm">
+              <Info className="h-4 w-4 text-amber-400" /> 工工四（クンクンシー）の読み方と入力の基本
             </h3>
-            <ul className="list-disc list-inside space-y-1.5 text-xs text-stone-600 leading-relaxed">
+            <ul className="list-disc list-inside space-y-1.5 leading-relaxed text-slate-300">
               <li>
-                <strong>縦書き表示</strong>: 伝統的な文化譜表記です。小節は右から左へと進みます。
+                <strong>縦書き格子表記</strong>: 譜面は【右から左】へと進みます。1列に基本12マスが縦に配置されます。
               </li>
               <li>
-                <strong>音符の入力</strong>: キーボードの数字キー `1`〜`0` またはキーパッドで一〜巾の絃を入力します。
+                <strong>音符入力</strong>: マス目をクリックし、画面下の【男弦】【中弦】【女弦】キーパッドまたは各勘所ボタンをタップして入力します。
               </li>
               <li>
-                <strong>和音入力</strong>: `Shift` キーを押しながら絃キーを押すか、和音モードをONにして入力します。
+                <strong>奏法記号</strong>: 打（打ち音）・踏（踏み音）・弾（弾き音）を各セルに指定できます。
               </li>
             </ul>
           </div>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <h3 className="font-bold text-stone-900 flex items-center gap-1.5 mb-2 font-score">
-              <Keyboard className="h-4 w-4 text-indigo-700" /> キーボードショートカット
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <h3 className="font-bold text-amber-400 flex items-center gap-1.5 mb-2 font-serif text-sm">
+              <Keyboard className="h-4 w-4 text-amber-400" /> キーボードショートカット
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-stone-300 text-stone-500">
+                  <tr className="border-b border-slate-800 text-slate-400">
                     <th className="py-2 pr-4 font-semibold">操作</th>
                     <th className="py-2 font-semibold">キー</th>
-                    <th className="py-2 pl-4 font-semibold">説明</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100 font-mono">
+                <tbody className="divide-y divide-slate-800/80 font-mono text-slate-200">
                   <tr>
-                    <td className="py-1.5 pr-4 font-sans font-medium text-stone-800">一〜巾の絃</td>
-                    <td className="py-1.5"><kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">1</kbd>〜<kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">0</kbd>, <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">-</kbd>, <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">^</kbd>, <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px] font-sans">円マーク</kbd></td>
-                    <td className="py-1.5 pl-4 font-sans text-stone-500">一〜巾の絃を打弦・入力</td>
+                    <td className="py-1.5 pr-4 font-sans font-medium">再生 / 一時停止</td>
+                    <td className="py-1.5"><kbd className="bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-[11px]">Space</kbd> / <kbd className="bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-[11px]">Esc</kbd></td>
                   </tr>
                   <tr>
-                    <td className="py-1.5 pr-4 font-sans font-medium text-stone-800">和音入力</td>
-                    <td className="py-1.5"><kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">Shift</kbd> + 絃キー</td>
-                    <td className="py-1.5 pl-4 font-sans text-stone-500">同じマスに2つ目の音を重ねる</td>
-                  </tr>
-                  <tr>
-                    <td className="py-1.5 pr-4 font-sans font-medium text-stone-800">音長変更</td>
-                    <td className="py-1.5"><kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">Q</kbd> (4分) / <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">W</kbd> (8分) / <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">E</kbd> (3連) / <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">R</kbd> (16分)</td>
-                    <td className="py-1.5 pl-4 font-sans text-stone-500">選択中の拍の分割切替</td>
-                  </tr>
-                  <tr>
-                    <td className="py-1.5 pr-4 font-sans font-medium text-stone-800">押し手（強押し / 巾押し）</td>
-                    <td className="py-1.5"><kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">Z</kbd> (半音強押) / <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">X</kbd> (全音巾押)</td>
-                    <td className="py-1.5 pl-4 font-sans text-stone-500">左手押し手トグル</td>
-                  </tr>
-                  <tr>
-                    <td className="py-1.5 pr-4 font-sans font-medium text-stone-800">再生 / 一時停止</td>
-                    <td className="py-1.5"><kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">Space</kbd> / <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">Esc</kbd></td>
-                    <td className="py-1.5 pl-4 font-sans text-stone-500">再生停止</td>
-                  </tr>
-                  <tr>
-                    <td className="py-1.5 pr-4 font-sans font-medium text-stone-800">コピペ</td>
-                    <td className="py-1.5"><kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">Ctrl</kbd>+<kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">C</kbd> / <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">Ctrl</kbd>+<kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">V</kbd> / <kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">Ctrl</kbd>+<kbd className="bg-stone-100 border px-1.5 py-0.5 rounded text-[11px]">X</kbd></td>
-                    <td className="py-1.5 pl-4 font-sans text-stone-500">Excel風複数セルコピー</td>
+                    <td className="py-1.5 pr-4 font-sans font-medium">印刷</td>
+                    <td className="py-1.5"><kbd className="bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-[11px]">Ctrl</kbd>+<kbd className="bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded text-[11px]">P</kbd></td>
                   </tr>
                 </tbody>
               </table>
@@ -98,10 +75,10 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end border-t border-stone-200 pt-4">
+        <div className="mt-6 flex justify-end border-t border-slate-800 pt-4">
           <button
             onClick={onClose}
-            className="rounded-lg bg-stone-900 px-5 py-2 text-xs font-semibold text-white hover:bg-stone-800 cursor-pointer"
+            className="rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold px-5 py-2 text-xs cursor-pointer"
           >
             閉じる
           </button>

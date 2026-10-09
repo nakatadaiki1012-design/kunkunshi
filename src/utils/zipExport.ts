@@ -4,25 +4,25 @@
  */
 
 import JSZip from 'jszip';
-import { KotoScore } from '../types/koto';
+import { KunkunshiScore } from '../types/kunkunshi';
 
-export async function exportAppFilesZip(score?: KotoScore): Promise<Blob> {
+export async function exportAppFilesZip(score?: KunkunshiScore): Promise<Blob> {
   const zip = new JSZip();
 
   const currentScoreJson = score
     ? JSON.stringify(score, null, 2)
-    : JSON.stringify({ note: 'Exported Koto Score' }, null, 2);
+    : JSON.stringify({ note: 'Exported Kunkunshi Score' }, null, 2);
 
-  zip.file('koto-score-export.json', currentScoreJson);
+  zip.file('kunkunshi-score-export.json', currentScoreJson);
   zip.file(
     'README.md',
-    `# 琴譜エディタ Pro (Koto Bunkafu Editor)
+    `# 工工四エディタ Pro (Kunkunshi Score Editor)
 
-このZIPには琴譜エディタのスコアデータおよび構成ファイルが含まれています。
+このZIPには工工四エディタのスコアデータおよび構成ファイルが含まれています。
 
 ## 使い方
 1. アプリのアドバンスドメニューから「JSONインポート」を選択します。
-2. \`koto-score-export.json\` を選択して読み込むとスコアが復元されます。
+2. \`kunkunshi-score-export.json\` を選択して読み込むとスコアが復元されます。
 `
   );
 

@@ -4,25 +4,15 @@
  */
 
 import React from 'react';
-import {
-  KotoScore,
-  TUNING_PRESETS,
-  KANJI_STRINGS,
-  RITSU_NAMES,
-  getPitches,
-  pc,
-  noteName,
-  midiToHz,
-  clamp
-} from '../types/koto';
-import { kotoSynth } from '../audio/kotoSynth';
-import { Volume2, ArrowUp, ArrowDown } from 'lucide-react';
+import { KunkunshiScore, TuningType } from '../types/kunkunshi';
+import { Sliders, Volume2, X } from 'lucide-react';
+import { sanshinSynth } from '../utils/audioSynth';
 
 interface TuningModalProps {
-  score: KotoScore;
+  score: KunkunshiScore;
   isOpen: boolean;
   onClose: () => void;
-  onUpdateTuning: (newTuning: KotoScore['tuning']) => void;
+  onUpdateTuning: (tuning: TuningType, pitchKey: string) => void;
 }
 
 export const TuningModal: React.FC<TuningModalProps> = ({
@@ -33,211 +23,93 @@ export const TuningModal: React.FC<TuningModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const currentTuning = score.tuning;
-  const pitches = getPitches(score);
-
-  const handlePresetChange = (presetKey: string) => {
-    if (presetKey === 'custom') {
-      onUpdateTuning({
-        ...currentTuning,
-        preset: 'custom',
-        custom: [...pitches]
-      });
-    } else {
-      onUpdateTuning({
-        ...currentTuning,
-        preset: presetKey,
-        custom: null
-      });
-    }
-  };
-
-  const handleRootChange = (newRoot: number) => {
-    onUpdateTuning({
-      ...currentTuning,
-      root: clamp(newRoot, 40, 80)
-    });
-  };
-
-  const handleTranspose = (delta: number) => {
-    if (currentTuning.preset === 'custom' && currentTuning.custom) {
-      onUpdateTuning({
-        ...currentTuning,
-        custom: currentTuning.custom.map(p => p + delta)
-      });
-    } else {
-      onUpdateTuning({
-        ...currentTuning,
-        root: clamp(currentTuning.root + delta, 40, 80)
-      });
-    }
-  };
-
-  const handleCustomStringPitchChange = (index: number, newPitch: number) => {
-    const newCustom = [...pitches];
-    newCustom[index] = clamp(newPitch, 36, 96);
-    onUpdateTuning({
-      ...currentTuning,
-      preset: 'custom',
-      custom: newCustom
-    });
-  };
-
-  const playPitch = (idx: number, midi: number) => {
-    kotoSynth.pluck(idx, midi, 0, 0.9);
+  const playPitchTest = (note: string) => {
+    sanshinSynth.playNote(note);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-2xl rounded-2xl bg-stone-50 border border-stone-300 shadow-2xl p-6 overflow-y-auto max-h-[90vh]">
-        <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-          <div>
-            <h2 className="text-xl font-bold font-score text-stone-900">調子設定</h2>
-            <p className="text-xs text-stone-500 mt-0.5">箏の調子（平調子・雲井調子等）や一の糸の基調音を設定します</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs select-none">
+      <div className="w-full max-w-xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100 flex flex-col gap-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-amber-400" />
+            <h2 className="text-base font-bold font-serif text-slate-100">
+              三線の調子・高さ（勘所）設定
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-200 hover:text-stone-700 cursor-pointer"
+            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 cursor-pointer"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="mt-5 space-y-6">
+        <div className="space-y-4 text-xs">
           <div>
-            <label className="block text-xs font-bold text-stone-700 mb-2">調子プリセット</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {Object.entries(TUNING_PRESETS).map(([key, preset]) => {
-                const isSelected = currentTuning.preset === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => handlePresetChange(key)}
-                    className={`flex flex-col items-start p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 ring-2 ring-indigo-500/30'
-                        : 'border-stone-200 bg-white text-stone-700 hover:border-stone-400'
-                    }`}
-                  >
-                    <span className="font-bold text-sm font-score">{preset.name}</span>
-                    <span className="text-[10px] text-stone-500 mt-0.5 line-clamp-1">{preset.desc}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl bg-stone-100/70 p-4 border border-stone-200">
-            <div>
-              <label className="block text-xs font-bold text-stone-700 mb-1">
-                一の糸（基調音）: {noteName(currentTuning.root)} ({RITSU_NAMES[pc(currentTuning.root)]})
-              </label>
-              <select
-                disabled={currentTuning.preset === 'custom'}
-                value={currentTuning.root}
-                onChange={e => handleRootChange(Number(e.target.value))}
-                className="w-full rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-800 disabled:opacity-50"
-              >
-                {[
-                  { m: 58, label: 'B♭3 (壱越半/10本)' },
-                  { m: 59, label: 'B3 (断金/10本)' },
-                  { m: 60, label: 'C4 (平調/11本)' },
-                  { m: 61, label: 'C♯4 (勝絶/12本)' },
-                  { m: 62, label: 'D4 (壱越/標準)' },
-                  { m: 63, label: 'E♭4 (平調)' },
-                  { m: 64, label: 'E4 (勝絶)' },
-                  { m: 65, label: 'F4 (下徴)' },
-                  { m: 66, label: 'F♯4 (双調)' },
-                  { m: 67, label: 'G4 (姫調)' },
-                  { m: 68, label: 'A♭4 (黄鐘)' },
-                  { m: 69, label: 'A4 (鸞鏡)' }
-                ].map(opt => (
-                  <option key={opt.m} value={opt.m}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-stone-700 mb-1">移調・キー変更</label>
-              <div className="flex items-center gap-2">
+            <label className="block text-slate-300 font-bold mb-1">調子（チューニング）</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'Honchoushi', name: '本調子 (C-F-C)', desc: '標準的な基本調子。1弦と2弦が4度、2弦と3弦が5度。' },
+                { id: 'Niagari', name: '二揚げ (C-G-C)', desc: '中弦（2弦）を全音上げた調子。賑やかな祝宴曲など。' },
+                { id: 'Sanagari', name: '三揚げ (C-F-B♭)', desc: '女弦（3弦）を下げる調子。独特の和風旋律。' },
+                { id: 'Custom', name: 'カスタム調子', desc: '自由チューニング設定' }
+              ].map(item => (
                 <button
-                  onClick={() => handleTranspose(-1)}
-                  className="flex flex-1 items-center justify-center gap-1 rounded-md border border-stone-300 bg-white py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 cursor-pointer"
+                  key={item.id}
+                  onClick={() => onUpdateTuning(item.id as TuningType, score.pitchKey)}
+                  className={`p-3 rounded-xl border text-left flex flex-col gap-1 cursor-pointer ${
+                    score.tuning === item.id
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold ring-1 ring-amber-400'
+                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                  }`}
                 >
-                  <ArrowDown className="h-3.5 w-3.5 text-stone-500" /> 半音下げる (-1)
+                  <span className="font-bold text-sm">{item.name}</span>
+                  <span className="text-[10px] text-slate-400 leading-relaxed">{item.desc}</span>
                 </button>
-                <button
-                  onClick={() => handleTranspose(1)}
-                  className="flex flex-1 items-center justify-center gap-1 rounded-md border border-stone-300 bg-white py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 cursor-pointer"
-                >
-                  <ArrowUp className="h-3.5 w-3.5 text-stone-500" /> 半音上げる (+1)
-                </button>
-              </div>
+              ))}
             </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-stone-700">各絃の音高（ピッチ）確認</label>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {KANJI_STRINGS.map((kanji, idx) => {
-                const midi = pitches[idx];
-                const hz = Math.round(midiToHz(midi));
-                return (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between rounded-lg border border-stone-200 bg-white p-2 text-xs shadow-2xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded bg-stone-900 font-score font-bold text-stone-50">
-                        {kanji}
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-stone-800">{noteName(midi)}</span>
-                        <span className="text-[10px] text-stone-400 font-mono">{hz}Hz</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {currentTuning.preset === 'custom' && (
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            onClick={() => handleCustomStringPitchChange(idx, midi + 1)}
-                            className="px-1 text-[10px] bg-stone-100 hover:bg-stone-200 rounded cursor-pointer"
-                          >
-                            +
-                          </button>
-                          <button
-                            onClick={() => handleCustomStringPitchChange(idx, midi - 1)}
-                            className="px-1 text-[10px] bg-stone-100 hover:bg-stone-200 rounded cursor-pointer"
-                          >
-                            -
-                          </button>
-                        </div>
-                      )}
-                      <button
-                        onClick={() => playPitch(idx, midi)}
-                        className="rounded p-1 text-stone-500 hover:bg-amber-100 hover:text-amber-800 cursor-pointer"
-                        title="試聴"
-                      >
-                        <Volume2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+            <label className="block text-slate-300 font-bold mb-1">勘所の高さ（本数・基調音）</label>
+            <select
+              value={score.pitchKey}
+              onChange={e => onUpdateTuning(score.tuning, e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-100 font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
+            >
+              <option value="1本本調子 (A-D-A)">1本本調子 (A-D-A / 低音)</option>
+              <option value="2本本調子 (A#-D#-A#)">2本本調子 (A#-D#-A#)</option>
+              <option value="3本本調子 (B-E-B)">3本本調子 (B-E-B)</option>
+              <option value="4本本調子 (C-F-C)">4本本調子 (C-F-C / 標準)</option>
+              <option value="5本本調子 (C#-F#-C#)">5本本調子 (C#-F#-C#)</option>
+              <option value="6本本調子 (D-G-D)">6本本調子 (D-G-D / 高音)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-bold mb-2">基本音の試聴（テスト鳴らし）</label>
+            <div className="flex flex-wrap gap-2">
+              {['合', '四', '七', '工', '五', '六', '八', '九', '巾'].map(n => (
+                <button
+                  key={n}
+                  onClick={() => playPitchTest(n)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-amber-600 hover:text-slate-950 text-amber-300 font-serif font-bold rounded-lg border border-slate-700 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>{n}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end border-t border-stone-200 pt-4">
+        <div className="mt-2 flex justify-end border-t border-slate-800 pt-3">
           <button
             onClick={onClose}
-            className="rounded-lg bg-stone-900 px-5 py-2 text-sm font-semibold text-white hover:bg-stone-800 cursor-pointer"
+            className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs rounded-lg shadow cursor-pointer"
           >
-            完了
+            設定完了
           </button>
         </div>
       </div>

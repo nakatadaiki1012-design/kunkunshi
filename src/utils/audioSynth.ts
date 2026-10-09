@@ -1,7 +1,13 @@
-// Web Audio API audio synthesizer for Okinawa Sanshin (三線) plucking sounds
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// Web Audio API audio synthesizer for Okinawa Sanshin (沖縄三線)
 
 class SanshinAudioSynthesizer {
   private ctx: AudioContext | null = null;
+  private volume: number = 0.8;
 
   private getContext(): AudioContext {
     if (!this.ctx) {
@@ -14,21 +20,27 @@ class SanshinAudioSynthesizer {
     return this.ctx;
   }
 
+  public setVolume(vol: number) {
+    this.volume = Math.max(0, Math.min(1, vol));
+  }
+
   // Pitch frequencies base mapping (C3 = 130.81Hz base for 4本本調子 C-F-C)
   private getNoteFrequency(note: string, basePitchOffsetSemitones: number = 0): number | null {
     const semitoneMap: Record<string, number> = {
-      // 男弦
+      // 男弦 (1st string - Low)
       '合': 0,   // C3
       '乙': 2,   // D3
       '下老': 3, // Eb3
       '老': 4,   // E3
-      // 中弦
+
+      // 中弦 (2nd string - Mid)
       '四': 5,   // F3
       '上': 6,   // F#3
       '工': 7,   // G3
       '五': 9,   // A3
       '六': 10,  // Bb3
-      // 女弦
+
+      // 女弦 (3rd string - High)
       '七': 12,  // C4
       '八': 14,  // D4
       '九': 16,  // E4
@@ -75,7 +87,7 @@ class SanshinAudioSynthesizer {
       // Gain Envelope (Snappy attack, initial pluck peak, natural decay)
       const gainNode = ctx.createGain();
       gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(0.4, now + 0.008); // Pluck attack
+      gainNode.gain.linearRampToValueAtTime(0.4 * this.volume, now + 0.008); // Pluck attack
       gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
       // Connect nodes
@@ -106,7 +118,7 @@ class SanshinAudioSynthesizer {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(isAccent ? 1200 : 800, now);
 
-      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.setValueAtTime(0.2 * this.volume, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
       osc.connect(gain);
