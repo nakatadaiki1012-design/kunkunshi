@@ -1,0 +1,6 @@
+{
+  "name": "工工四エディタ Pro - 沖縄三線スコア作成・演奏ビューア",
+  "description": "沖縄三線の工工四（クンクンシー）を編集・保存・視認性特化の演奏表示ができるスコアエディタ",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
