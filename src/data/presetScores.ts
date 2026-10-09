@@ -1,406 +1,257 @@
-import { KunkunshiScore } from '../types/kunkunshi';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-export const PRESET_SCORES: KunkunshiScore[] = [
+import { KotoScore, KANJI_STRINGS, createNewBeat, createEmptyScore } from '../types/koto';
+
+export interface PresetSongInfo {
+  id: string;
+  title: string;
+  subtitle: string;
+  composer: string;
+  description: string;
+  tuningName: string;
+  score: () => KotoScore;
+}
+
+export function createSakuraScore(): KotoScore {
+  const s = createEmptyScore();
+  s.id = 'sakura';
+  s.title = 'さくらさくら';
+  s.subtitle = '日本古謡';
+  s.composer = '日本古謡';
+  s.tempo = 72;
+  s.beatsPerMeasure = 4;
+  s.tuning = { preset: 'hira', root: 62, custom: null };
+
+  const bars = [
+    '五 五 六',
+    '五 五 六',
+    '五 六 七 六 五 六 五',
+    '五 六 七 六 五',
+    '七 八 九 八 七',
+    '八 七 六 五 七',
+    '六 五 六 五 四',
+    '五 六 七 六 五 六 五',
+    '五 六 七 六 五',
+    '七 八 九 八 七',
+    '八 七 六 五 七',
+    '六 五 六 五 四',
+    '三 五 四 三',
+    '五 五 六'
+  ];
+
+  s.measures = bars.map((bar) => ({
+    beats: bar.split(' ').map((tok) => {
+      if (tok === '-') {
+        return createNewBeat(2);
+      }
+      if (tok === '休') {
+        const b = createNewBeat(2);
+        b.slots[0].rest = true;
+        return b;
+      }
+      const chars = [...tok];
+      if (chars.length === 1) {
+        const b = createNewBeat(2);
+        const stringIdx = KANJI_STRINGS.indexOf(chars[0] as any);
+        if (stringIdx >= 0) {
+          b.slots[0].notes = [stringIdx];
+        }
+        return b;
+      }
+      const b = createNewBeat(chars.length as 1 | 2 | 3 | 4);
+      chars.forEach((c, i) => {
+        const stringIdx = KANJI_STRINGS.indexOf(c as any);
+        if (stringIdx >= 0) {
+          b.slots[i].notes = [stringIdx];
+        }
+      });
+      return b;
+    })
+  }));
+
+  if (s.measures[13]?.beats[0]?.slots[0]) {
+    s.measures[13].beats[0].slots[0].yuri = true;
+  }
+  if (s.measures[3]?.beats[1]?.slots[0]) {
+    s.measures[3].beats[1].slots[0].sukui = true;
+  }
+
+  return s;
+}
+
+export function createRokudanScore(): KotoScore {
+  const s = createEmptyScore();
+  s.id = 'rokudan';
+  s.title = '六段の調';
+  s.subtitle = '初段（八橋検校 作曲）';
+  s.composer = '八橋検校';
+  s.tempo = 56;
+  s.beatsPerMeasure = 4;
+  s.tuning = { preset: 'hira', root: 62, custom: null };
+
+  const bars = [
+    '五 - - -',
+    '五 六 七 八',
+    '九 七 八 九',
+    '巾 斗 為 巾',
+    '九 八 七 六',
+    '五 六 七 五',
+    '六 五 四 三',
+    '二 一 二 三',
+    '四 五 六 五',
+    '四 三 二 一',
+    '二 三 四 五',
+    '六 七 八 九',
+    '十 斗 為 巾',
+    '九 八 七 六',
+    '五 四 三 二',
+    '一 - - -'
+  ];
+
+  s.measures = bars.map(bar => ({
+    beats: bar.split(' ').map(tok => {
+      if (tok === '-') {
+        const b = createNewBeat(2);
+        b.slots[0].tie = true;
+        return b;
+      }
+      if (tok === '休') {
+        const b = createNewBeat(2);
+        b.slots[0].rest = true;
+        return b;
+      }
+      const chars = [...tok];
+      if (chars.length === 1) {
+        const b = createNewBeat(2);
+        const stringIdx = KANJI_STRINGS.indexOf(chars[0] as any);
+        if (stringIdx >= 0) {
+          b.slots[0].notes = [stringIdx];
+        }
+        return b;
+      }
+      const b = createNewBeat(chars.length as 1 | 2 | 3 | 4);
+      chars.forEach((c, i) => {
+        const stringIdx = KANJI_STRINGS.indexOf(c as any);
+        if (stringIdx >= 0) {
+          b.slots[i].notes = [stringIdx];
+        }
+      });
+      return b;
+    })
+  }));
+
+  if (s.measures[0]?.beats[0]?.slots[0]) {
+    s.measures[0].beats[0].slots[0].hiki = true;
+  }
+  if (s.measures[6]?.beats[1]?.slots[0]) {
+    s.measures[6].beats[1].slots[0].sukui = true;
+  }
+  if (s.measures[15]?.beats[0]?.slots[0]) {
+    s.measures[15].beats[0].slots[0].yuri = true;
+  }
+
+  return s;
+}
+
+export function createKojoScore(): KotoScore {
+  const s = createEmptyScore();
+  s.id = 'kojo';
+  s.title = '荒城の月';
+  s.subtitle = '滝廉太郎 作曲 / 箏曲編';
+  s.composer = '滝廉太郎';
+  s.tempo = 72;
+  s.beatsPerMeasure = 4;
+  s.tuning = { preset: 'hira_yon_up', root: 62, custom: null };
+
+  const bars = [
+    '五 五 六 七',
+    '六 五 四 三',
+    '四 五 六 五',
+    '四 三 二 一',
+    '五 五 六 七',
+    '六 五 四 三',
+    '四 五 六 五',
+    '四 三 二 一',
+    '六 六 七 八',
+    '七 六 五 四',
+    '五 六 七 六',
+    '五 四 三 二',
+    '四 三 四 五',
+    '四 四 三 二',
+    '一 - - -',
+    '休 休 休 休'
+  ];
+
+  const lyrics = [
+    'は る こう ろう の',
+    'は な の えん',
+    'め ぐ る さ か づ',
+    'き か げ さ し て',
+    'ち よ の ま つ が',
+    'え ほ ほ え み し',
+    'む か し の ひ か',
+    'り い ま い づ こ',
+    'て ん じ ょ う む',
+    'せ い の つ き か',
+    'げ つ ね に か わ',
+    'ら ぬ ひ か り な',
+    'れ ど む か し の',
+    'ひ か り い ま い',
+    'づ こ',
+    ''
+  ];
+
+  s.measures = bars.map((bar, mIdx) => ({
+    beats: bar.split(' ').map((tok, bIdx) => {
+      const b = createNewBeat(2);
+      if (tok === '休') {
+        b.slots[0].rest = true;
+      } else {
+        const stringIdx = KANJI_STRINGS.indexOf(tok as any);
+        if (stringIdx >= 0) {
+          b.slots[0].notes = [stringIdx];
+        }
+      }
+      const lyricWord = lyrics[mIdx]?.split(' ')[bIdx];
+      if (lyricWord && lyricWord !== '') {
+        b.lyrics = lyricWord;
+      }
+      return b;
+    })
+  }));
+
+  return s;
+}
+
+export const PRESET_SONGS: PresetSongInfo[] = [
   {
-    id: 'asatoya-yunta',
-    title: '安里屋ユンタ',
-    subtitle: '沖縄八重山民謡 / 竹富島古謡',
-    composer: '八重山古謡',
-    tuning: 'Honchoushi',
-    pitchKey: '4本本調子 (C-F-C)',
-    tempoBpm: 88,
-    cellsPerColumn: 12,
-    createdAt: '2026-10-08',
-    updatedAt: '2026-10-08',
-    notes: '沖縄民謡の代名詞。八重山竹富島の絶世の美女・安里屋クヤマの物語。1本〜4本本調子で演奏されることが多いです。',
-    columns: [
-      {
-        id: 'col-intro-1',
-        sectionTitle: '【歌持ち】',
-        columnLyric: '（前奏）',
-        cells: [
-          { id: 'c1', note: '四', lyric: '' },
-          { id: 'c2', note: '工', lyric: '' },
-          { id: 'c3', note: '五', lyric: '' },
-          { id: 'c4', note: '七', lyric: '' },
-          { id: 'c5', note: '六', lyric: '' },
-          { id: 'c6', note: '五', lyric: '' },
-          { id: 'c7', note: '工', lyric: '' },
-          { id: 'c8', note: '五', lyric: '' },
-          { id: 'c9', note: '四', lyric: '' },
-          { id: 'c10', note: '◯', lyric: '' },
-          { id: 'c11', note: '合', lyric: '' },
-          { id: 'c12', note: '乙', lyric: '' },
-        ],
-      },
-      {
-        id: 'col-intro-2',
-        sectionTitle: '',
-        columnLyric: '（歌持ち結び）',
-        cells: [
-          { id: 'c13', note: '老', lyric: '' },
-          { id: 'c14', note: '四', lyric: '' },
-          { id: 'c15', note: '工', lyric: '' },
-          { id: 'c16', note: '五', lyric: '' },
-          { id: 'c17', note: '四', lyric: '' },
-          { id: 'c18', note: '◯', lyric: '' },
-          { id: 'c19', note: '四', lyric: '' },
-          { id: 'c20', note: '工', lyric: '' },
-          { id: 'c21', note: '五', lyric: '' },
-          { id: 'c22', note: '六', lyric: '' },
-          { id: 'c23', note: '七', lyric: '' },
-          { id: 'c24', note: '◯', lyric: '' },
-        ],
-      },
-      {
-        id: 'col-1',
-        sectionTitle: '【一番】',
-        columnLyric: 'サー サー サー',
-        cells: [
-          { id: 'c25', note: '四', lyric: 'サ' },
-          { id: 'c26', note: '◯', lyric: 'ー' },
-          { id: 'c27', note: '工', lyric: 'サ' },
-          { id: 'c28', note: '◯', lyric: 'ー' },
-          { id: 'c29', note: '五', lyric: 'サ' },
-          { id: 'c30', note: '◯', lyric: 'ー' },
-          { id: 'c31', note: '七', lyric: 'ア' },
-          { id: 'c32', note: '六', lyric: 'サ' },
-          { id: 'c33', note: '五', lyric: 'ー' },
-          { id: 'c34', note: '工', lyric: 'ツ' },
-          { id: 'c35', note: '五', lyric: 'ー' },
-          { id: 'c36', note: '◯', lyric: '' },
-        ],
-      },
-      {
-        id: 'col-2',
-        sectionTitle: '',
-        columnLyric: '君は野中の',
-        cells: [
-          { id: 'c37', note: '四', lyric: 'キ' },
-          { id: 'c38', note: '四', lyric: 'ミ' },
-          { id: 'c39', note: '工', lyric: 'ワ' },
-          { id: 'c40', note: '五', lyric: 'ノ' },
-          { id: 'c41', note: '七', lyric: 'ナ' },
-          { id: 'c42', note: '六', lyric: 'カ' },
-          { id: 'c43', note: '五', lyric: 'ノ' },
-          { id: 'c44', note: '工', lyric: '' },
-          { id: 'c45', note: '四', lyric: '' },
-          { id: 'c46', note: '合', lyric: '' },
-          { id: 'c47', note: '乙', lyric: '' },
-          { id: 'c48', note: '老', lyric: '' },
-        ],
-      },
-      {
-        id: 'col-3',
-        sectionTitle: '',
-        columnLyric: '茨の花か',
-        cells: [
-          { id: 'c49', note: '四', lyric: 'イ' },
-          { id: 'c50', note: '工', lyric: 'バ' },
-          { id: 'c51', note: '五', lyric: 'ラ' },
-          { id: 'c52', note: '四', lyric: 'ノ' },
-          { id: 'c53', note: '合', lyric: 'ハ' },
-          { id: 'c54', note: '乙', lyric: 'ナ' },
-          { id: 'c55', note: '老', lyric: 'カ' },
-          { id: 'c56', note: '四', lyric: 'ー' },
-          { id: 'c57', note: '◯', lyric: '' },
-          { id: 'c58', note: '四', lyric: '' },
-          { id: 'c59', note: '工', lyric: '' },
-          { id: 'c60', note: '五', lyric: '' },
-        ],
-      },
-      {
-        id: 'col-4',
-        sectionTitle: '【返し】',
-        columnLyric: 'サー ユイユイ',
-        cells: [
-          { id: 'c61', note: '七', lyric: 'サ' },
-          { id: 'c62', note: '◯', lyric: 'ー' },
-          { id: 'c63', note: '八', lyric: 'ユ' },
-          { id: 'c64', note: '七', lyric: 'イ' },
-          { id: 'c65', note: '六', lyric: 'ユ' },
-          { id: 'c66', note: '五', lyric: 'イ' },
-          { id: 'c67', note: '工', lyric: 'マ' },
-          { id: 'c68', note: '五', lyric: 'タ' },
-          { id: 'c69', note: '四', lyric: 'ハ' },
-          { id: 'c70', note: '◯', lyric: 'ー' },
-          { id: 'c71', note: '合', lyric: 'リ' },
-          { id: 'c72', note: '乙', lyric: 'ヌ' },
-        ],
-      },
-      {
-        id: 'col-5',
-        sectionTitle: '',
-        columnLyric: '暮れて帰れば',
-        cells: [
-          { id: 'c73', note: '老', lyric: 'ク' },
-          { id: 'c74', note: '四', lyric: 'レ' },
-          { id: 'c75', note: '工', lyric: 'テ' },
-          { id: 'c76', note: '五', lyric: 'カ' },
-          { id: 'c77', note: '四', lyric: 'エ' },
-          { id: 'c78', note: '◯', lyric: 'レ' },
-          { id: 'c79', note: '四', lyric: 'バ' },
-          { id: 'c80', note: '工', lyric: '' },
-          { id: 'c81', note: '五', lyric: '' },
-          { id: 'c82', note: '六', lyric: '' },
-          { id: 'c83', note: '七', lyric: '' },
-          { id: 'c84', note: '◯', lyric: '' },
-        ],
-      },
-    ],
+    id: 'sakura',
+    title: 'さくらさくら',
+    subtitle: '日本古謡',
+    composer: '日本古謡',
+    description: '春の訪れを告げる日本を代表する伝統古謡。平調子の入門に最適。',
+    tuningName: '平調子',
+    score: createSakuraScore
   },
   {
-    id: 'tinsagu-no-hana',
-    title: 'てぃんさぐぬ花',
-    subtitle: '沖縄本島わらべ歌 / 教訓歌',
-    composer: '沖縄民謡',
-    tuning: 'Honchoushi',
-    pitchKey: '3本本調子 (B-E-B)',
-    tempoBpm: 72,
-    cellsPerColumn: 12,
-    createdAt: '2026-10-08',
-    updatedAt: '2026-10-08',
-    notes: '親の教えや心構えをホウセンカ（てぃんさぐ）の花に例えて歌った沖縄を代表する教訓歌。',
-    columns: [
-      {
-        id: 't-col-intro',
-        sectionTitle: '【歌持ち】',
-        columnLyric: '（前奏）',
-        cells: [
-          { id: 'tc1', note: '合', lyric: '' },
-          { id: 'tc2', note: '乙', lyric: '' },
-          { id: 'tc3', note: '老', lyric: '' },
-          { id: 'tc4', note: '四', lyric: '' },
-          { id: 'tc5', note: '工', lyric: '' },
-          { id: 'tc6', note: '五', lyric: '' },
-          { id: 'tc7', note: '四', lyric: '' },
-          { id: 'tc8', note: '老', lyric: '' },
-          { id: 'tc9', note: '乙', lyric: '' },
-          { id: 'tc10', note: '合', lyric: '' },
-          { id: 'tc11', note: '◯', lyric: '' },
-          { id: 'tc12', note: '合', lyric: '' },
-        ],
-      },
-      {
-        id: 't-col-1',
-        sectionTitle: '【一番】',
-        columnLyric: 'てぃんさぐぬ花や',
-        cells: [
-          { id: 'tc13', note: '合', lyric: 'ティ' },
-          { id: 'tc14', note: '乙', lyric: 'ン' },
-          { id: 'tc15', note: '老', lyric: 'サ' },
-          { id: 'tc16', note: '四', lyric: 'グ' },
-          { id: 'tc17', note: '工', lyric: 'ヌ' },
-          { id: 'tc18', note: '五', lyric: 'ハ' },
-          { id: 'tc19', note: '七', lyric: 'ナ' },
-          { id: 'tc20', note: '六', lyric: 'ヤ' },
-          { id: 'tc21', note: '五', lyric: 'ー' },
-          { id: 'tc22', note: '工', lyric: '' },
-          { id: 'tc23', note: '四', lyric: '' },
-          { id: 'tc24', note: '◯', lyric: '' },
-        ],
-      },
-      {
-        id: 't-col-2',
-        sectionTitle: '',
-        columnLyric: '爪先に染めて',
-        cells: [
-          { id: 'tc25', note: '四', lyric: 'ツ' },
-          { id: 'tc26', note: '工', lyric: 'メ' },
-          { id: 'tc27', note: '五', lyric: 'サ' },
-          { id: 'tc28', note: '七', lyric: 'キ' },
-          { id: 'tc29', note: '八', lyric: 'ニ' },
-          { id: 'tc30', note: '七', lyric: 'ソ' },
-          { id: 'tc31', note: '六', lyric: 'メ' },
-          { id: 'tc32', note: '五', lyric: 'テ' },
-          { id: 'tc33', note: '工', lyric: 'ー' },
-          { id: 'tc34', note: '◯', lyric: '' },
-          { id: 'tc35', note: '四', lyric: '' },
-          { id: 'tc36', note: '合', lyric: '' },
-        ],
-      },
-      {
-        id: 't-col-3',
-        sectionTitle: '',
-        columnLyric: '親の寄せる言開',
-        cells: [
-          { id: 'tc37', note: '乙', lyric: 'ウ' },
-          { id: 'tc38', note: '老', lyric: 'ヤ' },
-          { id: 'tc39', note: '四', lyric: 'ヌ' },
-          { id: 'tc40', note: '工', lyric: 'ユ' },
-          { id: 'tc41', note: '五', lyric: 'シ' },
-          { id: 'tc42', note: '七', lyric: 'イ' },
-          { id: 'tc43', note: '六', lyric: 'コ' },
-          { id: 'tc44', note: '五', lyric: 'ト' },
-          { id: 'tc45', note: '工', lyric: 'ー' },
-          { id: 'tc46', note: '◯', lyric: '' },
-          { id: 'tc47', note: '四', lyric: '' },
-          { id: 'tc48', note: '合', lyric: '' },
-        ],
-      },
-      {
-        id: 't-col-4',
-        sectionTitle: '',
-        columnLyric: '肝に染めよ',
-        cells: [
-          { id: 'tc49', note: '合', lyric: 'チ' },
-          { id: 'tc50', note: '乙', lyric: 'ム' },
-          { id: 'tc51', note: '老', lyric: 'ニ' },
-          { id: 'tc52', note: '四', lyric: 'ソ' },
-          { id: 'tc53', note: '工', lyric: 'メ' },
-          { id: 'tc54', note: '五', lyric: 'ヨ' },
-          { id: 'tc55', note: '四', lyric: 'ー' },
-          { id: 'tc56', note: '老', lyric: '' },
-          { id: 'tc57', note: '乙', lyric: '' },
-          { id: 'tc58', note: '合', lyric: '' },
-          { id: 'tc59', note: '◯', lyric: '' },
-          { id: 'tc60', note: '◯', lyric: '' },
-        ],
-      },
-    ],
+    id: 'kojo',
+    title: '荒城の月',
+    subtitle: '滝廉太郎 作曲',
+    composer: '滝廉太郎',
+    description: '四の糸を上らせた四上り平調子で奏でる抒情あふれる名曲。歌詞付き。',
+    tuningName: '四上り平調子',
+    score: createKojoScore
   },
   {
-    id: 'nada-sou-sou',
-    title: '涙そうそう',
-    subtitle: 'BEGIN / 夏川りみ',
-    composer: 'BEGIN',
-    tuning: 'Honchoushi',
-    pitchKey: '4本本調子 (C-F-C)',
-    tempoBpm: 76,
-    cellsPerColumn: 12,
-    createdAt: '2026-10-08',
-    updatedAt: '2026-10-08',
-    notes: '森山良子作詞、BEGIN作曲の珠玉の名曲。三線の温かい音色と非常に相性が良いです。',
-    columns: [
-      {
-        id: 'n-col-intro',
-        sectionTitle: '【前奏】',
-        columnLyric: '（イントロ）',
-        cells: [
-          { id: 'nc1', note: '四', lyric: '' },
-          { id: 'nc2', note: '工', lyric: '' },
-          { id: 'nc3', note: '五', lyric: '' },
-          { id: 'nc4', note: '七', lyric: '' },
-          { id: 'nc5', note: '八', lyric: '' },
-          { id: 'nc6', note: '七', lyric: '' },
-          { id: 'nc7', note: '六', lyric: '' },
-          { id: 'nc8', note: '五', lyric: '' },
-          { id: 'nc9', note: '工', lyric: '' },
-          { id: 'nc10', note: '四', lyric: '' },
-          { id: 'nc11', note: '◯', lyric: '' },
-          { id: 'nc12', note: '四', lyric: '' },
-        ],
-      },
-      {
-        id: 'n-col-A1',
-        sectionTitle: '【Aメロ】',
-        columnLyric: '古いアルバムめくり',
-        cells: [
-          { id: 'nc13', note: '四', lyric: 'フ' },
-          { id: 'nc14', note: '四', lyric: 'ル' },
-          { id: 'nc15', note: '工', lyric: 'イ' },
-          { id: 'nc16', note: '五', lyric: 'ア' },
-          { id: 'nc17', note: '七', lyric: 'ル' },
-          { id: 'nc18', note: '六', lyric: 'バ' },
-          { id: 'nc19', note: '五', lyric: 'ム' },
-          { id: 'nc20', note: '工', lyric: 'メ' },
-          { id: 'nc21', note: '四', lyric: 'ク' },
-          { id: 'nc22', note: '合', lyric: 'リ' },
-          { id: 'nc23', note: '乙', lyric: 'ー' },
-          { id: 'nc24', note: '老', lyric: '' },
-        ],
-      },
-      {
-        id: 'n-col-A2',
-        sectionTitle: '',
-        columnLyric: 'ありがとうってつぶやいた',
-        cells: [
-          { id: 'nc25', note: '老', lyric: 'ア' },
-          { id: 'nc26', note: '四', lyric: 'リ' },
-          { id: 'nc27', note: '工', lyric: 'ガ' },
-          { id: 'nc28', note: '五', lyric: 'ト' },
-          { id: 'nc29', note: '七', lyric: 'ウ' },
-          { id: 'nc30', note: '六', lyric: 'ツ' },
-          { id: 'nc31', note: '五', lyric: 'ブ' },
-          { id: 'nc32', note: '工', lyric: 'ヤ' },
-          { id: 'nc33', note: '四', lyric: 'イ' },
-          { id: 'nc34', note: '◯', lyric: 'タ' },
-          { id: 'nc35', note: '四', lyric: '' },
-          { id: 'nc36', note: '工', lyric: '' },
-        ],
-      },
-      {
-        id: 'n-col-B1',
-        sectionTitle: '【サビ】',
-        columnLyric: '晴れ渡る日も 雨の日も',
-        cells: [
-          { id: 'nc37', note: '七', lyric: 'ハ' },
-          { id: 'nc38', note: '八', lyric: 'レ' },
-          { id: 'nc39', note: '九', lyric: 'ワ' },
-          { id: 'nc40', note: '七', lyric: 'タ' },
-          { id: 'nc41', note: '八', lyric: 'ル' },
-          { id: 'nc42', note: '七', lyric: 'ヒ' },
-          { id: 'nc43', note: '六', lyric: 'モ' },
-          { id: 'nc44', note: '五', lyric: 'ア' },
-          { id: 'nc45', note: '七', lyric: 'メ' },
-          { id: 'nc46', note: '六', lyric: 'ノ' },
-          { id: 'nc47', note: '五', lyric: 'ヒ' },
-          { id: 'nc48', note: '工', lyric: 'モ' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'kagiyadefu',
-    title: 'かぎやで風節',
-    subtitle: '沖縄古典音楽 / 祝宴歌',
-    composer: '琉球古典音楽',
-    tuning: 'Honchoushi',
-    pitchKey: '4本本調子 (C-F-C)',
-    tempoBpm: 56,
-    cellsPerColumn: 12,
-    createdAt: '2026-10-08',
-    updatedAt: '2026-10-08',
-    notes: 'おめでたい祝宴や式典の冒頭で必ず演奏される琉球古典曲の最高峰。「今日の誇らしゃや...」',
-    columns: [
-      {
-        id: 'k-col-1',
-        sectionTitle: '【歌持ち】',
-        columnLyric: '（歌持ち）',
-        cells: [
-          { id: 'kc1', note: '工', lyric: '', technique: '打' },
-          { id: 'kc2', note: '五', lyric: '' },
-          { id: 'kc3', note: '七', lyric: '' },
-          { id: 'kc4', note: '八', lyric: '' },
-          { id: 'kc5', note: '七', lyric: '' },
-          { id: 'kc6', note: '六', lyric: '' },
-          { id: 'kc7', note: '五', lyric: '' },
-          { id: 'kc8', note: '工', lyric: '' },
-          { id: 'kc9', note: '四', lyric: '' },
-          { id: 'kc10', note: '合', lyric: '' },
-          { id: 'kc11', note: '乙', lyric: '' },
-          { id: 'kc12', note: '老', lyric: '' },
-        ],
-      },
-      {
-        id: 'k-col-2',
-        sectionTitle: '【初句】',
-        columnLyric: '今日の誇らしゃや',
-        cells: [
-          { id: 'kc13', note: '四', lyric: 'キ' },
-          { id: 'kc14', note: '工', lyric: 'ヨ' },
-          { id: 'kc15', note: '五', lyric: 'ウ' },
-          { id: 'kc16', note: '七', lyric: 'ノ' },
-          { id: 'kc17', note: '六', lyric: 'ホ' },
-          { id: 'kc18', note: '五', lyric: 'コ' },
-          { id: 'kc19', note: '工', lyric: 'ラ' },
-          { id: 'kc20', note: '四', lyric: 'シ' },
-          { id: 'kc21', note: '合', lyric: 'ャ' },
-          { id: 'kc22', note: '乙', lyric: 'ヤ' },
-          { id: 'kc23', note: '老', lyric: 'ー' },
-          { id: 'kc24', note: '◯', lyric: '' },
-        ],
-      },
-    ],
-  },
+    id: 'rokudan',
+    title: '六段の調',
+    subtitle: '初段（八橋検校 作曲）',
+    composer: '八橋検校',
+    description: '近世箏曲の最高峰。格式高い古典の響きとリズム変化の模範。',
+    tuningName: '平調子',
+    score: createRokudanScore
+  }
 ];

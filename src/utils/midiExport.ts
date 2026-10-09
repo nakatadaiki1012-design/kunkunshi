@@ -1,0 +1,144 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { KotoScore, getPitches } from '../types/koto';
+
+function writeVarLen(val: number): number[] {
+  const bytes = [];
+  let buffer = val & 0x7f;
+  while ((val >>= 7) > 0) {
+    buffer <<= 8;
+    buffer |= 0x80;
+    buffer += val & 0x7f;
+  }
+  while (true) {
+    bytes.push(buffer & 0xff);
+    if (buffer & 0x80) buffer >>= 8;
+    else break;
+  }
+  return bytes;
+}
+
+export function exportScoreToMidi(score: KotoScore): Blob {
+  const ticksPerQuarter = 480;
+  const bpm = score.tempo;
+  const microsecondsPerQuarter = Math.round(60000000 / bpm);
+  const pitches = getPitches(score);
+
+  interface MidiEvent {
+    tick: number;
+    data: number[];
+  }
+
+  const events: MidiEvent[] = [];
+
+  const titleBytes = Array.from(new TextEncoder().encode(score.title || 'Koto Song'));
+  events.push({
+    tick: 0,
+    data: [0xff, 0x03, titleBytes.length, ...titleBytes]
+  });
+
+  events.push({
+    tick: 0,
+    data: [
+      0xff, 0x51, 0x03,
+      (microsecondsPerQuarter >> 16) & 0xff,
+      (microsecondsPerQuarter >> 8) & 0xff,
+      microsecondsPerQuarter & 0xff
+    ]
+  });
+
+  events.push({
+    tick: 0,
+    data: [0xc0, 107] // GM Koto #108 (0-indexed = 107)
+  });
+
+  const beatsPerMeasure = score.beatsPerMeasure;
+  score.measures.forEach((m, mIdx) => {
+    m.beats.forEach((b, bIdx) => {
+      const beatTicks = (mIdx * beatsPerMeasure + bIdx) * ticksPerQuarter;
+      b.slots.forEach((sl, sIdx) => {
+        if (sl.rest || !sl.notes.length) return;
+        let slotTickOffset = sIdx * Math.round(ticksPerQuarter / b.div);
+        let currentSlotTicks = Math.round(ticksPerQuarter / b.div);
+
+        if (b.subDiv === '8_16_16') {
+          slotTickOffset = sIdx === 0 ? 0 : sIdx === 1 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.75);
+          currentSlotTicks = sIdx === 0 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.25);
+        } else if (b.subDiv === '16_16_8') {
+          slotTickOffset = sIdx === 0 ? 0 : sIdx === 1 ? Math.round(ticksPerQuarter * 0.25) : Math.round(ticksPerQuarter * 0.5);
+          currentSlotTicks = sIdx === 2 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.25);
+        }
+
+        const noteStartTick = beatTicks + slotTickOffset;
+        let noteDurationTicks = Math.max(20, Math.round(currentSlotTicks * 0.9));
+
+        for (let nextS = sIdx + 1; nextS < b.slots.length; nextS++) {
+          const nextSlot = b.slots[nextS];
+          if (nextSlot.tie || (!nextSlot.rest && (!nextSlot.notes || nextSlot.notes.length === 0))) {
+            let nextSlotTicks = Math.round(ticksPerQuarter / b.div);
+            if (b.subDiv === '8_16_16') {
+              nextSlotTicks = nextS === 0 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.25);
+            } else if (b.subDiv === '16_16_8') {
+              nextSlotTicks = nextS === 2 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.25);
+            }
+            noteDurationTicks += nextSlotTicks;
+          } else {
+            break;
+          }
+        }
+
+        sl.notes.forEach(strIdx => {
+          if (strIdx < 0 || strIdx >= (score.stringCount || 13)) return;
+          const basePitch = pitches[strIdx];
+          const actualPitch = Math.min(127, Math.max(0, basePitch + (sl.oshi || 0)));
+
+          events.push({
+            tick: noteStartTick,
+            data: [0x90, actualPitch, 96]
+          });
+          events.push({
+            tick: noteStartTick + noteDurationTicks,
+            data: [0x80, actualPitch, 0]
+          });
+        });
+      });
+    });
+  });
+
+  events.sort((a, b) => a.tick - b.tick);
+
+  const trackBytes: number[] = [];
+  let lastTick = 0;
+  events.forEach(evt => {
+    const delta = evt.tick - lastTick;
+    trackBytes.push(...writeVarLen(delta));
+    trackBytes.push(...evt.data);
+    lastTick = evt.tick;
+  });
+
+  trackBytes.push(...writeVarLen(0));
+  trackBytes.push(0xff, 0x2f, 0x00);
+
+  const headerBytes = [
+    0x4d, 0x54, 0x68, 0x64,
+    0x00, 0x00, 0x00, 0x06,
+    0x00, 0x00,
+    0x00, 0x01,
+    (ticksPerQuarter >> 8) & 0xff, ticksPerQuarter & 0xff
+  ];
+
+  const trkLen = trackBytes.length;
+  const trackHeader = [
+    0x4d, 0x54, 0x72, 0x6b,
+    (trkLen >> 24) & 0xff,
+    (trkLen >> 16) & 0xff,
+    (trkLen >> 8) & 0xff,
+    trkLen & 0xff
+  ];
+
+  const fullFile = new Uint8Array([...headerBytes, ...trackHeader, ...trackBytes]);
+  return new Blob([fullFile], { type: 'audio/midi' });
+}

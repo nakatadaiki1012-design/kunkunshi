@@ -1,6 +1,6 @@
 {
-  "name": "工工四エディタ Pro - 沖縄三線スコア作成・演奏ビューア",
-  "description": "沖縄三線の工工四（クンクンシー）を編集・保存・視認性特化の演奏表示ができるスコアエディタ",
+  "name": "琴譜エディタ Pro - 十三絃・十七絃 箏文化譜スコア作成・演奏ビューア",
+  "description": "箏（琴）の文化譜を編集・保存・WAV/MIDI出力・リアルタイム音源再生・自動演奏表示できるWebアプリ。",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,420 +1,1373 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { KunkunshiScore, KunkunshiCell, ViewMode, DisplayTheme, TuningType } from './types/kunkunshi';
-import { PRESET_SCORES } from './data/presetScores';
-import { sanshinSynth } from './utils/audioSynth';
-import { Header } from './components/Header';
-import { PerformanceToolbar } from './components/PerformanceToolbar';
-import { ScoreViewVertical } from './components/ScoreViewVertical';
-import { EditPalette } from './components/EditPalette';
-import { PresetSelectorModal } from './components/PresetSelectorModal';
-import { AiGeneratorModal } from './components/AiGeneratorModal';
-import { PrintScoreView } from './components/PrintScoreView';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-const STORAGE_KEY = 'kunkunshi_current_score_v1';
-const SAVED_SCORES_KEY = 'kunkunshi_saved_scores_v1';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  KotoScore,
+  Slot,
+  CursorPosition,
+  KANJI_STRINGS,
+  KEYBOARD_ROW1,
+  KEYBOARD_HOME,
+  createNewSlot,
+  createNewBeat,
+  createNewMeasure,
+  createEmptyScore,
+  normalizeScore,
+  getPitches,
+  clamp,
+  LEFT_HAND_ORNS,
+  RIGHT_HAND_ORNS,
+  InputDivType
+} from './types/koto';
+import { createSakuraScore, createKojoScore } from './data/presetScores';
+import { kotoSynth } from './audio/kotoSynth';
+import { Header } from './components/Header';
+import { Dock } from './components/Dock';
+import { MeasureNavigator } from './components/MeasureNavigator';
+import { VirtualKoto } from './components/VirtualKoto';
+import { ScoreSheetVertical } from './components/ScoreSheetVertical';
+import { ScoreSheetHorizontal } from './components/ScoreSheetHorizontal';
+import { TuningModal } from './components/TuningModal';
+import { ScoreLibraryModal } from './components/ScoreLibraryModal';
+import { ExportModal } from './components/ExportModal';
+import { HelpModal } from './components/HelpModal';
+import { PracticeModeOverlay } from './components/PracticeModeOverlay';
+import { NewScoreWizardModal } from './components/NewScoreWizardModal';
+
+const DRAFT_STORAGE_KEY = 'kotoBunkafu.draft.v7';
+
+export interface CopiedSlotItem {
+  slot: Slot;
+  sourceDiv: 1 | 2 | 3 | 4;
+}
 
 export default function App() {
-  // Current Score State
-  const [currentScore, setCurrentScore] = useState<KunkunshiScore>(() => {
+  const [score, setScore] = useState<KotoScore>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.warn('Failed to load score from storage', e);
+      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.id === 'sakura') return createSakuraScore();
+        if (parsed?.id === 'kojo') return createKojoScore();
+        return normalizeScore(parsed, createSakuraScore());
+      }
+    } catch {
+      // ignore
     }
-    return PRESET_SCORES[0]; // Default: 安里屋ユンタ
+    return createSakuraScore();
   });
 
-  // Saved Scores List
-  const [savedScores, setSavedScores] = useState<KunkunshiScore[]>(() => {
-    try {
-      const stored = localStorage.getItem(SAVED_SCORES_KEY);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.warn('Failed to load saved scores', e);
-    }
-    return [];
-  });
+  const scoreContainerRef = useRef<HTMLDivElement>(null);
+  const undoStackRef = useRef<KotoScore[]>([]);
+  const redoStackRef = useRef<KotoScore[]>([]);
+  const [historyVersion, setHistoryVersion] = useState(0);
 
-  // UI Modes & Themes
-  const [viewMode, setViewMode] = useState<ViewMode>('performance');
-  const [theme, setTheme] = useState<DisplayTheme>('dark');
-  const [zoomLevel, setZoomLevel] = useState<number>(125); // Default 125% for high legibility
-  const [bpm, setBpm] = useState<number>(currentScore.tempoBpm || 84);
+  const [cursor, setCursor] = useState<CursorPosition>({ m: 0, b: 0, s: 0, low: false });
+  const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
+  const [selAnchor, setSelAnchor] = useState<number | null>(null);
+  const [slotAnchor, setSlotAnchor] = useState<{ m: number; b: number; s: number } | null>(null);
+  const [selectedSlotKeys, setSelectedSlotKeys] = useState<Set<string>>(new Set());
+  const [isDraggingSlots, setIsDraggingSlots] = useState(false);
+  const [statusToast, setStatusToast] = useState<string | null>(null);
+  const [inputDiv, setInputDiv] = useState<InputDivType>(2);
+  const [isChordMode, setIsChordMode] = useState(false);
+  const [lastEnteredSlot, setLastEnteredSlot] = useState<{ m: number; b: number; s: number } | null>(null);
 
-  // Selection state
-  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
-  const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
-  const [selectedCell, setSelectedCell] = useState<KunkunshiCell | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentPlayKey, setCurrentPlayKey] = useState<string | null>(null);
+  const [loopActive, setLoopActive] = useState(false);
+  const [loopRange, setLoopRange] = useState<[number, number]>([1, score.measures.length]);
+  const [speed, setSpeed] = useState(1);
+  const [volume, setVolume] = useState(0.8);
+  const [countIn, setCountIn] = useState(false);
+  const [metronome, setMetronome] = useState(false);
 
-  // Playback & Audio
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [activeBeatIndex, setActiveBeatIndex] = useState<number | null>(null);
-  const [isMetronomeOn, setIsMetronomeOn] = useState<boolean>(false);
-  const [isAudioOn, setIsAudioOn] = useState<boolean>(true);
+  const [isTuningOpen, setIsTuningOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [isNewScoreWizardOpen, setIsNewScoreWizardOpen] = useState(false);
 
-  // Modals
-  const [isPresetModalOpen, setIsPresetModalOpen] = useState<boolean>(false);
-  const [isAiModalOpen, setIsAiModalOpen] = useState<boolean>(false);
+  const clipboardRef = useRef<any[] | null>(null);
+  const slotClipboardRef = useRef<CopiedSlotItem[] | null>(null);
 
-  // Sync current score to LocalStorage automatically
+  const showToast = useCallback((msg: string) => {
+    setStatusToast(msg);
+    setTimeout(() => {
+      setStatusToast(curr => (curr === msg ? null : curr));
+    }, 2200);
+  }, []);
+
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
+  useEffect(() => {
+    const onGlobalMouseUp = () => setIsDraggingSlots(false);
+    window.addEventListener('mouseup', onGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', onGlobalMouseUp);
+  }, []);
+
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentScore));
-      // Also update saved list entry if exists
-      setSavedScores((prev) => {
-        const existingIdx = prev.findIndex((s) => s.id === currentScore.id);
-        if (existingIdx >= 0) {
-          const updated = [...prev];
-          updated[existingIdx] = currentScore;
-          localStorage.setItem(SAVED_SCORES_KEY, JSON.stringify(updated));
-          return updated;
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(score));
+    } catch {
+      // ignore
+    }
+  }, [score]);
+
+  useEffect(() => {
+    if (score.view.layout === 'vertical' && scoreContainerRef.current) {
+      setTimeout(() => {
+        if (scoreContainerRef.current) {
+          scoreContainerRef.current.scrollLeft = scoreContainerRef.current.scrollWidth;
         }
-        return prev;
-      });
-    } catch (e) {
-      console.warn('Storage sync error', e);
+      }, 100);
     }
-  }, [currentScore]);
+  }, [score.view.layout]);
 
-  // Flatten cells for sequential auto-scroll playback
-  const allFlattenedCellsRef = useRef<{ note: string; columnId: string; cellId: string }[]>([]);
-  useEffect(() => {
-    const list: { note: string; columnId: string; cellId: string }[] = [];
-    currentScore.columns.forEach((col) => {
-      col.cells.forEach((cell) => {
-        list.push({ note: cell.note, columnId: col.id, cellId: cell.id });
-      });
+  const pushUndo = useCallback((prevScore: KotoScore) => {
+    undoStackRef.current.push(JSON.parse(JSON.stringify(prevScore)));
+    if (undoStackRef.current.length > 50) {
+      undoStackRef.current.shift();
+    }
+    redoStackRef.current = [];
+    setHistoryVersion(v => v + 1);
+  }, []);
+
+  const mutateScore = useCallback((updater: (draft: KotoScore) => void) => {
+    setScore(prev => {
+      pushUndo(prev);
+      const next = JSON.parse(JSON.stringify(prev));
+      updater(next);
+      return next;
     });
-    allFlattenedCellsRef.current = list;
-  }, [currentScore]);
+  }, [pushUndo]);
 
-  // Auto-Scroll Playback Timer
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
+  const handleCreateScoreFromWizard = useCallback((newScore: KotoScore) => {
+    pushUndo(score);
+    setScore(newScore);
+    setCursor({ m: 0, b: 0, s: 0, low: false });
+    setSelectedSlotKeys(new Set());
+    setSelectedRange(null);
+    setSelAnchor(null);
+    setSlotAnchor(null);
+    undoStackRef.current = [];
+    redoStackRef.current = [];
+    setHistoryVersion(v => v + 1);
+    showToast(`「${newScore.title || '無題'}」を作成しました`);
+  }, [score, pushUndo, showToast]);
 
-    if (isPlaying) {
-      const intervalMs = Math.round((60 / bpm) * 1000); // ms per beat
+  const handleUndo = useCallback(() => {
+    if (!undoStackRef.current.length) return;
+    const prev = undoStackRef.current.pop()!;
+    redoStackRef.current.push(JSON.parse(JSON.stringify(score)));
+    setScore(prev);
+    setHistoryVersion(v => v + 1);
+  }, [score]);
 
-      timer = setInterval(() => {
-        setActiveBeatIndex((prevIndex) => {
-          const totalBeats = allFlattenedCellsRef.current.length;
-          if (totalBeats === 0) return null;
+  const handleRedo = useCallback(() => {
+    if (!redoStackRef.current.length) return;
+    const next = redoStackRef.current.pop()!;
+    undoStackRef.current.push(JSON.parse(JSON.stringify(score)));
+    setScore(next);
+    setHistoryVersion(v => v + 1);
+  }, [score]);
 
-          const nextIndex = prevIndex === null ? 0 : (prevIndex + 1) % totalBeats;
-          const currentCellData = allFlattenedCellsRef.current[nextIndex];
+  const isFitAll = score.view.zoom <= 0.72;
+  const handleToggleFitAll = useCallback(() => {
+    mutateScore(d => {
+      if (d.view.zoom <= 0.72) {
+        d.view.zoom = 1.0;
+      } else {
+        d.view.zoom = 0.58;
+      }
+    });
+  }, [mutateScore]);
 
-          if (currentCellData) {
-            // Play audio pitch preview if note is not rest
-            if (isAudioOn && currentCellData.note && currentCellData.note !== '◯' && currentCellData.note !== '休') {
-              sanshinSynth.playNote(currentCellData.note);
+  const handleSetZoom100 = useCallback(() => {
+    mutateScore(d => {
+      d.view.zoom = 1.0;
+    });
+  }, [mutateScore]);
+
+  const playStateRef = useRef<{
+    active: boolean;
+    currentBeat: number;
+    anchorTime: number;
+    anchorBeat: number;
+    timer: any;
+    raf: any;
+    warmed: boolean;
+  }>({
+    active: false,
+    currentBeat: 0,
+    anchorTime: 0,
+    anchorBeat: 0,
+    timer: null,
+    raf: null,
+    warmed: false
+  });
+
+  const stopPlayback = useCallback(() => {
+    playStateRef.current.active = false;
+    clearTimeout(playStateRef.current.timer);
+    cancelAnimationFrame(playStateRef.current.raf);
+    kotoSynth.dampAll();
+    setIsPlaying(false);
+    setCurrentPlayKey(null);
+  }, []);
+
+  const startPlayback = useCallback((fromBeat: number = 0) => {
+    const ctx = kotoSynth.ensureContext();
+    if (!playStateRef.current.warmed) {
+      playStateRef.current.warmed = true;
+      kotoSynth.prewarm(getPitches(score));
+    }
+
+    const bpm = score.beatsPerMeasure;
+    const totalMeasures = score.measures.length;
+    let [rangeStart, rangeEnd] = loopActive
+      ? [(clamp(loopRange[0], 1, totalMeasures) - 1) * bpm, clamp(loopRange[1], 1, totalMeasures) * bpm]
+      : [0, totalMeasures * bpm];
+
+    if (fromBeat < rangeStart || fromBeat >= rangeEnd) {
+      fromBeat = rangeStart;
+    }
+
+    interface PlayItem {
+      beat: number;
+      m: number;
+      b: number;
+      s: number;
+      metro?: boolean;
+      accent?: boolean;
+      slot?: any;
+    }
+
+    const items: PlayItem[] = [];
+    score.measures.forEach((ms, m) => {
+      ms.beats.forEach((bt, b) => {
+        items.push({ beat: m * bpm + b, m, b, s: 0, metro: true, accent: b === 0 });
+        bt.slots.forEach((sl, s) => {
+          let resolvedSlot = sl;
+          if (sl.repeat2) {
+            let prevB = b - 2;
+            let prevM = m;
+            if (prevB < 0) {
+              prevM = m - 1;
+              prevB = bpm + prevB;
             }
-            // Metronome click
-            if (isMetronomeOn) {
-              sanshinSynth.playClick(nextIndex % 4 === 0);
+            if (prevM >= 0) {
+              const prevBeat = score.measures[prevM]?.beats[prevB];
+              if (prevBeat && prevBeat.slots[s]) {
+                resolvedSlot = prevBeat.slots[s];
+              }
             }
           }
-
-          return nextIndex;
+          let slotOffset = s / bt.div;
+          items.push({
+            beat: m * bpm + b + slotOffset,
+            m,
+            b,
+            s,
+            slot: resolvedSlot
+          });
         });
-      }, intervalMs);
-    } else {
-      if (timer) clearInterval(timer);
-    }
-
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [isPlaying, bpm, isAudioOn, isMetronomeOn]);
-
-  // Cell Selection Handler
-  const handleSelectCell = (columnId: string, cellId: string, cell: KunkunshiCell) => {
-    setSelectedColumnId(columnId);
-    setSelectedCellId(cellId);
-    setSelectedCell(cell);
-  };
-
-  // Cell Content Updates
-  const updateCellProperty = (
-    updater: (c: KunkunshiCell) => KunkunshiCell
-  ) => {
-    if (!selectedColumnId || !selectedCellId) return;
-
-    setCurrentScore((prevScore) => {
-      const updatedColumns = prevScore.columns.map((col) => {
-        if (col.id === selectedColumnId) {
-          return {
-            ...col,
-            cells: col.cells.map((c) => (c.id === selectedCellId ? updater(c) : c)),
-          };
-        }
-        return col;
       });
-
-      return {
-        ...prevScore,
-        columns: updatedColumns,
-        updatedAt: new Date().toISOString().split('T')[0],
-      };
     });
 
-    // Also update current selectedCell state
-    setSelectedCell((prev) => (prev ? updater(prev) : null));
-  };
+    const spb = 60 / (score.tempo * speed);
+    const now = ctx.currentTime;
+    let t0 = now + 0.08;
 
-  const handleUpdateCellNote = (note: string) => {
-    updateCellProperty((c) => ({ ...c, note }));
-  };
-
-  const handleUpdateCellTechnique = (technique: string) => {
-    updateCellProperty((c) => ({ ...c, technique }));
-  };
-
-  const handleUpdateCellLyric = (lyric: string) => {
-    updateCellProperty((c) => ({ ...c, lyric }));
-  };
-
-  const handleClearCell = () => {
-    updateCellProperty((c) => ({ ...c, note: '', technique: '', lyric: '' }));
-  };
-
-  // Add / Delete Column
-  const handleAddColumn = () => {
-    const newColId = `col-${Date.now()}`;
-    const newCells: KunkunshiCell[] = Array.from({ length: currentScore.cellsPerColumn || 12 }, (_, i) => ({
-      id: `${newColId}-c${i + 1}`,
-      note: '',
-    }));
-
-    setCurrentScore((prev) => ({
-      ...prev,
-      columns: [
-        ...prev.columns,
-        {
-          id: newColId,
-          sectionTitle: `第 ${prev.columns.length + 1} 行`,
-          cells: newCells,
-        },
-      ],
-      updatedAt: new Date().toISOString().split('T')[0],
-    }));
-  };
-
-  const handleDeleteColumn = () => {
-    if (!selectedColumnId) return;
-    if (currentScore.columns.length <= 1) {
-      alert('これ以上列を削除できません。最低1列必要です。');
-      return;
-    }
-
-    setCurrentScore((prev) => ({
-      ...prev,
-      columns: prev.columns.filter((col) => col.id !== selectedColumnId),
-      updatedAt: new Date().toISOString().split('T')[0],
-    }));
-
-    setSelectedColumnId(null);
-    setSelectedCellId(null);
-    setSelectedCell(null);
-  };
-
-  // Next / Prev Cell Navigation
-  const handleSelectNextCell = () => {
-    if (!selectedCellId) return;
-    const flatList = allFlattenedCellsRef.current;
-    const currentIdx = flatList.findIndex((item) => item.cellId === selectedCellId);
-    if (currentIdx >= 0 && currentIdx < flatList.length - 1) {
-      const nextItem = flatList[currentIdx + 1];
-      const targetCol = currentScore.columns.find((c) => c.id === nextItem.columnId);
-      const targetCell = targetCol?.cells.find((c) => c.id === nextItem.cellId);
-      if (targetCell) {
-        handleSelectCell(nextItem.columnId, nextItem.cellId, targetCell);
+    if (countIn) {
+      for (let i = 0; i < bpm; i++) {
+        kotoSynth.click(t0 + i * spb, i === 0);
       }
+      t0 += bpm * spb;
     }
-  };
 
-  const handleSelectPrevCell = () => {
-    if (!selectedCellId) return;
-    const flatList = allFlattenedCellsRef.current;
-    const currentIdx = flatList.findIndex((item) => item.cellId === selectedCellId);
-    if (currentIdx > 0) {
-      const prevItem = flatList[currentIdx - 1];
-      const targetCol = currentScore.columns.find((c) => c.id === prevItem.columnId);
-      const targetCell = targetCol?.cells.find((c) => c.id === prevItem.cellId);
-      if (targetCell) {
-        handleSelectCell(prevItem.columnId, prevItem.cellId, targetCell);
+    playStateRef.current.active = true;
+    playStateRef.current.anchorTime = t0;
+    playStateRef.current.anchorBeat = fromBeat;
+    setIsPlaying(true);
+
+    const pitches = getPitches(score);
+    let schedIdx = items.findIndex(it => it.beat >= fromBeat);
+    if (schedIdx < 0) schedIdx = 0;
+
+    const schedule = () => {
+      if (!playStateRef.current.active) return;
+      const curCtxTime = ctx.currentTime;
+      const curBeatTime = (b: number) =>
+        playStateRef.current.anchorTime +
+        (b - playStateRef.current.anchorBeat) * spb;
+
+      while (schedIdx < items.length) {
+        const item = items[schedIdx];
+        if (item.beat >= rangeEnd) {
+          if (loopActive) {
+            const loopDuration = (rangeEnd - rangeStart) * spb;
+            playStateRef.current.anchorTime += loopDuration;
+            playStateRef.current.anchorBeat = rangeStart;
+            schedIdx = items.findIndex(it => it.beat >= rangeStart);
+            continue;
+          } else {
+            break;
+          }
+        }
+
+        const itemTime = curBeatTime(item.beat);
+        if (itemTime > curCtxTime + 0.45) break;
+
+        if (itemTime >= curCtxTime - 0.05) {
+          if (item.metro && metronome) {
+            kotoSynth.click(itemTime, item.accent);
+          } else if (item.slot && !item.slot.rest && item.slot.notes?.length) {
+            item.slot.notes.forEach((strIdx: number) => {
+              if (strIdx >= 0 && strIdx < (score.stringCount || 13)) {
+                const pitch = pitches[strIdx] + (item.slot.ato ? 0 : item.slot.oshi || 0);
+                let bend = null;
+                if (item.slot.ato) {
+                  bend = { type: 'ato' as const, amt: item.slot.oshi || 1, dur: 0.8 };
+                } else if (item.slot.hanashi) {
+                  bend = { type: 'hanashi' as const, amt: item.slot.oshi || 1, dur: 0.8 };
+                } else if (item.slot.hikiiro) {
+                  bend = { type: 'hikiiro' as const, dur: 0.6 };
+                } else if (item.slot.tsuki) {
+                  bend = { type: 'tsuki' as const, dur: 0.3 };
+                } else if (item.slot.yuri) {
+                  bend = { type: 'yuri' as const, dur: 1.2 };
+                }
+                const vel = item.slot.sukui ? 0.72 : 0.85;
+                const bright = item.slot.sukui ? 0.92 : 0.85;
+                kotoSynth.pluck(strIdx, pitch, itemTime, vel, bright, bend);
+              }
+            });
+          }
+        }
+        schedIdx++;
       }
-    }
-  };
 
-  // Fullscreen
-  const handleToggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((e) => console.warn(e));
-    } else {
-      document.exitFullscreen().catch((e) => console.warn(e));
-    }
-  };
-
-  // Export JSON File
-  const handleExportJson = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(currentScore, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `${currentScore.title}_kunkunshi.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  };
-
-  // Import JSON String
-  const handleImportJson = (jsonString: string) => {
-    const parsed = JSON.parse(jsonString);
-    if (!parsed.title || !parsed.columns) {
-      throw new Error('Invalid Kunkunshi structure');
-    }
-    setCurrentScore(parsed);
-    setBpm(parsed.tempoBpm || 84);
-  };
-
-  // Delete Saved Score
-  const handleDeleteSavedScore = (id: string) => {
-    const updated = savedScores.filter((s) => s.id !== id);
-    setSavedScores(updated);
-    localStorage.setItem(SAVED_SCORES_KEY, JSON.stringify(updated));
-  };
-
-  // Create Blank Score
-  const handleCreateNewScore = () => {
-    const newScore: KunkunshiScore = {
-      id: `score-${Date.now()}`,
-      title: '新しい工工四譜面',
-      subtitle: '無題',
-      tuning: 'Honchoushi',
-      pitchKey: '4本本調子 (C-F-C)',
-      tempoBpm: 80,
-      cellsPerColumn: 12,
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0],
-      columns: Array.from({ length: 4 }, (_, colIdx) => ({
-        id: `col-${colIdx + 1}`,
-        sectionTitle: `第 ${colIdx + 1} 行`,
-        cells: Array.from({ length: 12 }, (_, cellIdx) => ({
-          id: `c-${colIdx + 1}-${cellIdx + 1}`,
-          note: '',
-        })),
-      })),
+      if (schedIdx >= items.length && !loopActive) {
+        const lastTime = curBeatTime(rangeEnd);
+        if (curCtxTime >= lastTime + 0.5) {
+          stopPlayback();
+          return;
+        }
+      }
+      playStateRef.current.timer = setTimeout(schedule, 40);
     };
-    setCurrentScore(newScore);
-    setBpm(80);
+
+    schedule();
+
+    const syncVisuals = () => {
+      if (!playStateRef.current.active) return;
+      const curCtxTime = ctx.currentTime;
+      const elapsed = curCtxTime - playStateRef.current.anchorTime;
+      const curBeat = playStateRef.current.anchorBeat + elapsed / spb;
+
+      const activeItem = items
+        .filter(it => !it.metro && it.beat <= curBeat && it.beat > curBeat - 0.7)
+        .pop();
+
+      if (activeItem) {
+        setCurrentPlayKey(`${activeItem.m}-${activeItem.b}-${activeItem.s}`);
+      } else {
+        setCurrentPlayKey(null);
+      }
+      playStateRef.current.raf = requestAnimationFrame(syncVisuals);
+    };
+
+    syncVisuals();
+  }, [score, loopActive, loopRange, speed, countIn, metronome, stopPlayback]);
+
+  const togglePlay = () => {
+    if (isPlaying) {
+      stopPlayback();
+    } else {
+      startPlayback(cursor.m * score.beatsPerMeasure + cursor.b);
+    }
+  };
+
+  const previewSlot = useCallback((sl: any) => {
+    if (!sl || sl.rest || !sl.notes?.length) return;
+    const pitches = getPitches(score);
+    sl.notes.forEach((strIdx: number) => {
+      if (strIdx >= 0 && strIdx < (score.stringCount || 13)) {
+        const p = pitches[strIdx] + (sl.ato ? 0 : sl.oshi || 0);
+        kotoSynth.pluck(strIdx, p, 0, 0.85);
+      }
+    });
+  }, [score]);
+
+  const handlePrevSlot = useCallback(() => {
+    setCursor(prev => {
+      let m = prev.m;
+      let b = prev.b;
+      let s = prev.s - 1;
+      if (s < 0) {
+        b--;
+        if (b < 0) {
+          m = Math.max(0, m - 1);
+          b = score.beatsPerMeasure - 1;
+        }
+        const prevBeat = score.measures[m]?.beats[b] || { div: 1 };
+        s = (prevBeat.slots?.length || prevBeat.div) - 1;
+      }
+      return { m, b, s, low: false };
+    });
+  }, [score]);
+
+  const handleNextSlot = useCallback(() => {
+    setCursor(prev => {
+      let m = prev.m;
+      let b = prev.b;
+      let s = prev.s + 1;
+      const beat = score.measures[m]?.beats[b] || { div: 1 };
+      const slotCount = beat.slots?.length || beat.div;
+      if (s >= slotCount) {
+        s = 0;
+        b++;
+        if (b >= score.beatsPerMeasure) {
+          b = 0;
+          m = Math.min(score.measures.length - 1, m + 1);
+        }
+      }
+      return { m, b, s, low: false };
+    });
+  }, [score]);
+
+  const inputString = useCallback((stringIndex: number, forceChord?: boolean) => {
+    const pitches = getPitches(score);
+    kotoSynth.pluck(stringIndex, pitches[stringIndex], 0, 0.85);
+
+    mutateScore(draft => {
+      let m = cursor.m;
+      let b = cursor.b;
+      let s = cursor.s;
+
+      while (m >= draft.measures.length) {
+        draft.measures.push(createNewMeasure(draft.beatsPerMeasure));
+      }
+
+      const beat = draft.measures[m].beats[b];
+      if (cursor.low && beat.div === 1) {
+        beat.div = 2;
+        const oldSlot = beat.slots[0];
+        beat.slots = [oldSlot, createNewSlot()];
+        s = 1;
+      }
+
+      if (s === 0 && beat.slots[0].notes.length === 0 && !beat.slots[0].rest) {
+        if (typeof inputDiv === 'number' && beat.div !== inputDiv) {
+          beat.div = inputDiv;
+          beat.subDiv = inputDiv === 3 ? 'equal' : undefined;
+          beat.slots = Array.from({ length: inputDiv }, () => createNewSlot());
+        }
+      }
+
+      const slot = beat.slots[s];
+      slot.rest = false;
+      slot.tie = false;
+
+      const chord = forceChord !== undefined ? forceChord : isChordMode;
+      if (chord) {
+        if (slot.notes.includes(stringIndex)) {
+          slot.notes = slot.notes.filter(n => n !== stringIndex);
+        } else {
+          slot.notes = [...slot.notes, stringIndex].sort((x, y) => x - y);
+        }
+      } else {
+        slot.notes = [stringIndex];
+      }
+
+      setLastEnteredSlot({ m, b, s });
+
+      if (!chord) {
+        let nextS = s + 1;
+        let nextB = b;
+        let nextM = m;
+        const slotCount = beat.slots?.length || beat.div;
+        if (nextS >= slotCount) {
+          nextS = 0;
+          nextB++;
+          if (nextB >= draft.beatsPerMeasure) {
+            nextB = 0;
+            nextM++;
+            if (nextM >= draft.measures.length) {
+              draft.measures.push(createNewMeasure(draft.beatsPerMeasure));
+            }
+          }
+        }
+        setCursor({ m: nextM, b: nextB, s: nextS, low: false });
+      }
+    });
+  }, [score, cursor, inputDiv, isChordMode, mutateScore]);
+
+  const handleSetInputDiv = useCallback((newDiv: InputDivType) => {
+    setInputDiv(newDiv);
+    mutateScore(draft => {
+      let m = cursor.m;
+      let b = cursor.b;
+      while (m >= draft.measures.length) {
+        draft.measures.push(createNewMeasure(draft.beatsPerMeasure));
+      }
+      const beat = draft.measures[m]?.beats[b];
+      if (!beat) return;
+
+      const oldSlots = beat.slots || [];
+      beat.div = typeof newDiv === 'number' ? newDiv : 3;
+      beat.subDiv = newDiv === 3 ? 'equal' : undefined;
+
+      const newSlots: any[] = [];
+      const count = typeof newDiv === 'number' ? newDiv : 3;
+      for (let i = 0; i < count; i++) {
+        if (i < oldSlots.length) {
+          newSlots.push(oldSlots[i]);
+        } else {
+          newSlots.push(createNewSlot());
+        }
+      }
+      beat.slots = newSlots;
+    });
+  }, [cursor.m, cursor.b, mutateScore]);
+
+  const handleInputRest = useCallback(() => {
+    mutateScore(draft => {
+      const beat = draft.measures[cursor.m]?.beats[cursor.b];
+      if (!beat) return;
+      const slot = beat.slots[cursor.s];
+      if (!slot) return;
+      slot.notes = [];
+      slot.tie = false;
+      slot.rest = true;
+    });
+  }, [cursor, mutateScore]);
+
+  const handleInputTie = useCallback(() => {
+    mutateScore(draft => {
+      const beat = draft.measures[cursor.m]?.beats[cursor.b];
+      if (!beat) return;
+      const slot = beat.slots[cursor.s];
+      if (!slot) return;
+      slot.notes = [];
+      slot.rest = false;
+      slot.repeat2 = false;
+      slot.tie = true;
+    });
+  }, [cursor, mutateScore]);
+
+  const handleInputRepeat2 = useCallback(() => {
+    mutateScore(draft => {
+      const beat = draft.measures[cursor.m]?.beats[cursor.b];
+      if (!beat) return;
+      const slot = beat.slots[cursor.s];
+      if (!slot) return;
+      slot.notes = [];
+      slot.rest = false;
+      slot.tie = false;
+      slot.repeat2 = true;
+    });
+  }, [cursor, mutateScore]);
+
+  const handleInputClear = useCallback(() => {
+    mutateScore(draft => {
+      if (selectedSlotKeys.size > 0) {
+        selectedSlotKeys.forEach(k => {
+          const [mStr, bStr, sStr] = k.split('-');
+          const m = parseInt(mStr, 10);
+          const b = parseInt(bStr, 10);
+          const s = parseInt(sStr, 10);
+          const slot = draft.measures[m]?.beats[b]?.slots[s];
+          if (slot) {
+            slot.notes = [];
+            slot.rest = false;
+            slot.tie = false;
+            slot.oshi = 0;
+            slot.finger = undefined;
+            LEFT_HAND_ORNS.forEach(key => (slot[key] = false));
+            RIGHT_HAND_ORNS.forEach(key => (slot[key] = false));
+          }
+        });
+        setSelectedSlotKeys(new Set());
+        return;
+      }
+
+      const beat = draft.measures[cursor.m]?.beats[cursor.b];
+      if (!beat) return;
+      const slot = beat.slots[cursor.s];
+      if (!slot) return;
+      slot.notes = [];
+      slot.rest = false;
+      slot.tie = false;
+      slot.oshi = 0;
+      slot.finger = undefined;
+      LEFT_HAND_ORNS.forEach(k => (slot[k] = false));
+      RIGHT_HAND_ORNS.forEach(k => (slot[k] = false));
+    });
+  }, [cursor, selectedSlotKeys, mutateScore]);
+
+  const handleSetFinger = useCallback((fingerNum: number | undefined) => {
+    mutateScore(draft => {
+      const targetPos = lastEnteredSlot || cursor;
+      const slot = draft.measures[targetPos.m]?.beats[targetPos.b]?.slots[targetPos.s];
+      if (slot) slot.finger = fingerNum;
+    });
+  }, [cursor, lastEnteredSlot, mutateScore]);
+
+  const handleToggleOrn = useCallback((ornKey: string) => {
+    mutateScore(draft => {
+      const applyOrn = (slot: any) => {
+        if (ornKey === 'oshi1') {
+          slot.oshi = slot.oshi === 1 ? 0 : 1;
+        } else if (ornKey === 'oshi2') {
+          slot.oshi = slot.oshi === 2 ? 0 : 2;
+        } else {
+          const val = !slot[ornKey];
+          if (ornKey === 'kaki' && val) slot.hiki = false;
+          if (ornKey === 'hiki' && val) slot.kaki = false;
+          slot[ornKey] = val;
+        }
+      };
+
+      const targetPos = (lastEnteredSlot && lastEnteredSlot.m === cursor.m && lastEnteredSlot.b === cursor.b && lastEnteredSlot.s === cursor.s)
+        ? lastEnteredSlot
+        : cursor;
+      const slot = draft.measures[targetPos.m]?.beats[targetPos.b]?.slots[targetPos.s];
+      if (!slot) return;
+      applyOrn(slot);
+    });
+  }, [cursor, lastEnteredSlot, mutateScore]);
+
+  const handleAddMeasure = useCallback(() => {
+    mutateScore(draft => {
+      draft.measures.push(createNewMeasure(draft.beatsPerMeasure));
+    });
+  }, [mutateScore]);
+
+  const handleInsertMeasure = useCallback(() => {
+    mutateScore(draft => {
+      draft.measures.splice(cursor.m, 0, createNewMeasure(draft.beatsPerMeasure));
+    });
+  }, [cursor.m, mutateScore]);
+
+  const handleInsertMeasureAt = useCallback((mIdx: number) => {
+    mutateScore(draft => {
+      draft.measures.splice(mIdx, 0, createNewMeasure(draft.beatsPerMeasure));
+    });
+  }, [mutateScore]);
+
+  const handleDuplicateMeasure = useCallback((mIdx: number) => {
+    mutateScore(draft => {
+      const target = draft.measures[mIdx];
+      if (target) {
+        draft.measures.splice(mIdx + 1, 0, JSON.parse(JSON.stringify(target)));
+      }
+    });
+  }, [mutateScore]);
+
+  const handleDeleteMeasureAt = useCallback((mIdx: number) => {
+    mutateScore(draft => {
+      if (draft.measures.length <= 1) {
+        draft.measures = [createNewMeasure(draft.beatsPerMeasure)];
+      } else {
+        draft.measures.splice(mIdx, 1);
+        setCursor(prev => ({ ...prev, m: Math.min(prev.m, draft.measures.length - 1) }));
+      }
+    });
+  }, [mutateScore]);
+
+  const handleDeleteMeasure = useCallback(() => {
+    mutateScore(draft => {
+      if (draft.measures.length <= 1) {
+        draft.measures = [createNewMeasure(draft.beatsPerMeasure)];
+      } else {
+        draft.measures.splice(cursor.m, 1);
+        setCursor(prev => ({ ...prev, m: Math.min(prev.m, draft.measures.length - 1) }));
+      }
+    });
+  }, [cursor.m, mutateScore]);
+
+  const selectSlotRange = useCallback(
+    (anchor: { m: number; b: number; s: number }, target: { m: number; b: number; s: number }) => {
+      const toLinear = (pos: { m: number; b: number; s: number }) => pos.m * 10000 + pos.b * 100 + pos.s;
+      const minL = Math.min(toLinear(anchor), toLinear(target));
+      const maxL = Math.max(toLinear(anchor), toLinear(target));
+      const newSet = new Set<string>();
+
+      score.measures.forEach((meas, m) => {
+        meas.beats.forEach((b, bI) => {
+          b.slots.forEach((_, sI) => {
+            const lin = m * 10000 + bI * 100 + sI;
+            if (lin >= minL && lin <= maxL) {
+              newSet.add(`${m}-${bI}-${sI}`);
+            }
+          });
+        });
+      });
+      setSelectedSlotKeys(newSet);
+    },
+    [score]
+  );
+
+  const handleSlotMouseDown = useCallback(
+    (mIdx: number, bIdx: number, sIdx: number, e: React.MouseEvent) => {
+      if (e.shiftKey && slotAnchor) {
+        selectSlotRange(slotAnchor, { m: mIdx, b: bIdx, s: sIdx });
+        setCursor({ m: mIdx, b: bIdx, s: sIdx, low: false });
+      } else {
+        setSlotAnchor({ m: mIdx, b: bIdx, s: sIdx });
+        setSelectedSlotKeys(new Set());
+        setIsDraggingSlots(true);
+        setSelectedRange(null);
+        setCursor({ m: mIdx, b: bIdx, s: sIdx, low: false });
+      }
+    },
+    [slotAnchor, selectSlotRange]
+  );
+
+  const handleSlotMouseEnter = useCallback(
+    (mIdx: number, bIdx: number, sIdx: number) => {
+      if (isDraggingSlots && slotAnchor) {
+        selectSlotRange(slotAnchor, { m: mIdx, b: bIdx, s: sIdx });
+        setCursor({ m: mIdx, b: bIdx, s: sIdx, low: false });
+      }
+    },
+    [isDraggingSlots, slotAnchor, selectSlotRange]
+  );
+
+  const handleSlotMouseUp = useCallback(() => {
+    setIsDraggingSlots(false);
+  }, []);
+
+  const handleSlotClick = useCallback(
+    (mIdx: number, bIdx: number, sIdx: number) => {
+      const beat = score.measures[mIdx]?.beats[bIdx];
+      setCursor({ m: mIdx, b: bIdx, s: sIdx, low: false });
+      if (beat) setInputDiv(beat.div);
+      setLastEnteredSlot(null);
+      const sl = score.measures[mIdx]?.beats[bIdx]?.slots[sIdx];
+      if (sl && sl.notes?.length && !isPlaying) {
+        previewSlot(sl);
+      }
+    },
+    [score, isPlaying, previewSlot]
+  );
+
+  const handleCopy = useCallback(() => {
+    if (selectedSlotKeys.size > 0) {
+      const sortedKeys = Array.from(selectedSlotKeys).sort((a, b) => {
+        const [m1, b1, s1] = a.split('-').map(Number);
+        const [m2, b2, s2] = b.split('-').map(Number);
+        return m1 * 10000 + b1 * 100 + s1 - (m2 * 10000 + b2 * 100 + s2);
+      });
+      const copied: CopiedSlotItem[] = [];
+      sortedKeys.forEach(k => {
+        const [m, b, s] = k.split('-').map(Number);
+        const beat = score.measures[m]?.beats[b];
+        const slot = beat?.slots[s];
+        if (slot && beat) {
+          copied.push({
+            slot: JSON.parse(JSON.stringify(slot)),
+            sourceDiv: beat.div || 2
+          });
+        }
+      });
+      slotClipboardRef.current = copied;
+      showToast(`${copied.length}音をコピーしました (Ctrl+C)`);
+    }
+  }, [selectedSlotKeys, score, showToast]);
+
+  const handlePaste = useCallback(() => {
+    if (slotClipboardRef.current && slotClipboardRef.current.length > 0) {
+      const copiedSlots = slotClipboardRef.current;
+      mutateScore(draft => {
+        let curM = cursor.m;
+        let curB = cursor.b;
+        let curS = cursor.s;
+        copiedSlots.forEach(item => {
+          while (curM >= draft.measures.length) {
+            draft.measures.push(createNewMeasure(draft.beatsPerMeasure));
+          }
+          let meas = draft.measures[curM];
+          let beat = meas.beats[curB];
+          if (beat && beat.slots[curS]) {
+            beat.slots[curS] = JSON.parse(JSON.stringify(item.slot));
+          }
+          curS++;
+          if (beat && curS >= beat.slots.length) {
+            curS = 0;
+            curB++;
+            if (curB >= meas.beats.length) {
+              curB = 0;
+              curM++;
+            }
+          }
+        });
+        setCursor({ m: curM, b: curB, s: curS, low: false });
+      });
+      showToast(`${copiedSlots.length}音を貼り付けました (Ctrl+V)`);
+    }
+  }, [cursor, mutateScore, showToast]);
+
+  const handleMeasureClick = useCallback(
+    (mIdx: number) => {
+      setCursor({ m: mIdx, b: 0, s: 0 });
+      startPlayback(mIdx * score.beatsPerMeasure);
+    },
+    [score.beatsPerMeasure, startPlayback]
+  );
+
+  const handleLyricsChange = useCallback((mIdx: number, bIdx: number, text: string) => {
+    setScore(prev => {
+      const next = JSON.parse(JSON.stringify(prev));
+      if (next.measures[mIdx]?.beats[bIdx]) {
+        next.measures[mIdx].beats[bIdx].lyrics = text;
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        if (e.key === 'Escape') (document.activeElement as HTMLElement).blur();
+        return;
+      }
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          handleUndo();
+          return;
+        }
+        if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+          e.preventDefault();
+          handleRedo();
+          return;
+        }
+        if (e.key === 'c') {
+          e.preventDefault();
+          handleCopy();
+          return;
+        }
+        if (e.key === 'v') {
+          e.preventDefault();
+          handlePaste();
+          return;
+        }
+        if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault();
+          setIsNewScoreWizardOpen(true);
+          return;
+        }
+        if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          handlePrint();
+          return;
+        }
+        if (e.key === 's') {
+          e.preventDefault();
+          setIsExportOpen(true);
+          return;
+        }
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          startPlayback(cursor.m * score.beatsPerMeasure + cursor.b);
+        } else {
+          togglePlay();
+        }
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        if (isPlaying) {
+          stopPlayback();
+        } else {
+          setSelectedSlotKeys(new Set());
+          setSelectedRange(null);
+        }
+        return;
+      }
+
+      if (e.key === 'q' || e.key === 'Q') {
+        handleSetInputDiv(1);
+        return;
+      }
+      if (e.key === 'w' || e.key === 'W') {
+        handleSetInputDiv(2);
+        return;
+      }
+      if (e.key === 'e' || e.key === 'E') {
+        handleSetInputDiv(3);
+        return;
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        handleSetInputDiv(4);
+        return;
+      }
+
+      if (e.key === 'p' || e.key === 'P' || e.key === '.') {
+        handleInputRest();
+        return;
+      }
+      if (e.key === 't' || e.key === 'T' || e.key === ',') {
+        handleInputTie();
+        return;
+      }
+      if (e.key === 'Delete') {
+        handleInputClear();
+        return;
+      }
+
+      const ornMap: Record<string, string> = {
+        z: 'oshi1',
+        x: 'oshi2',
+        y: 'ato',
+        u: 'hanashi',
+        i: 'hikiiro',
+        o: 'tsuki',
+        m: 'yuri',
+        c: 'sukui',
+        v: 'kaki',
+        b: 'hiki',
+        n: 'trem',
+        '/': 'nagashi'
+      };
+      if (ornMap[e.key] || ornMap[e.key.toLowerCase()]) {
+        handleToggleOrn(ornMap[e.key] || ornMap[e.key.toLowerCase()]);
+        return;
+      }
+
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        let m = cursor.m;
+        let b = cursor.b;
+        let s = cursor.s;
+        const beat = score.measures[m]?.beats[b] || { div: 1 };
+        const slotCount = beat.slots?.length || beat.div;
+
+        if (score.view.layout === 'vertical') {
+          if (e.key === 'ArrowDown') {
+            s++;
+            if (s >= slotCount) {
+              s = 0;
+              b++;
+              if (b >= score.beatsPerMeasure) {
+                b = 0;
+                m = Math.min(score.measures.length - 1, m + 1);
+              }
+            }
+          } else if (e.key === 'ArrowUp') {
+            s--;
+            if (s < 0) {
+              b--;
+              if (b < 0) {
+                m = Math.max(0, m - 1);
+                b = score.beatsPerMeasure - 1;
+              }
+              const prevBeat = score.measures[m]?.beats[b] || { div: 1 };
+              s = (prevBeat.slots?.length || prevBeat.div) - 1;
+            }
+          } else if (e.key === 'ArrowLeft') {
+            m = Math.min(score.measures.length - 1, m + score.view.perLine);
+          } else if (e.key === 'ArrowRight') {
+            m = Math.max(0, m - score.view.perLine);
+          }
+        } else {
+          if (e.key === 'ArrowRight') {
+            s++;
+            if (s >= slotCount) {
+              s = 0;
+              b++;
+              if (b >= score.beatsPerMeasure) {
+                b = 0;
+                m = Math.min(score.measures.length - 1, m + 1);
+              }
+            }
+          } else if (e.key === 'ArrowLeft') {
+            s--;
+            if (s < 0) {
+              b--;
+              if (b < 0) {
+                m = Math.max(0, m - 1);
+                b = score.beatsPerMeasure - 1;
+              }
+              const prevBeat = score.measures[m]?.beats[b] || { div: 1 };
+              s = (prevBeat.slots?.length || prevBeat.div) - 1;
+            }
+          } else if (e.key === 'ArrowDown') {
+            m = Math.min(score.measures.length - 1, m + score.view.perLine);
+          } else if (e.key === 'ArrowUp') {
+            m = Math.max(0, m - score.view.perLine);
+          }
+        }
+
+        const nextPos = { m, b, s, low: false };
+        if (e.shiftKey) {
+          const anchor = slotAnchor || { m: cursor.m, b: cursor.b, s: cursor.s };
+          if (!slotAnchor) setSlotAnchor(anchor);
+          selectSlotRange(anchor, nextPos);
+        } else {
+          setSelectedSlotKeys(new Set());
+          setSelectedRange(null);
+          setSlotAnchor(nextPos);
+        }
+        setCursor(nextPos);
+        return;
+      }
+
+      const digitCodeMap: Record<string, number> = {
+        Digit1: 0,
+        Digit2: 1,
+        Digit3: 2,
+        Digit4: 3,
+        Digit5: 4,
+        Digit6: 5,
+        Digit7: 6,
+        Digit8: 7,
+        Digit9: 8,
+        Digit0: 9,
+        Minus: 10,
+        Equal: 11,
+        IntlYen: 12,
+        Backslash: 12
+      };
+      if (e.code in digitCodeMap) {
+        const strIdx = digitCodeMap[e.code];
+        if (strIdx !== undefined && strIdx < (score.stringCount || 13)) {
+          e.preventDefault();
+          inputString(strIdx, e.shiftKey ? true : undefined);
+          return;
+        }
+      }
+
+      const row1Idx = KEYBOARD_ROW1.indexOf(e.key as any);
+      if (row1Idx >= 0) {
+        inputString(row1Idx, e.shiftKey ? true : undefined);
+        return;
+      }
+
+      const homeIdx = KEYBOARD_HOME.indexOf(e.key.toLowerCase() as any);
+      if (homeIdx >= 0) {
+        inputString(homeIdx, e.shiftKey ? true : undefined);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    score,
+    cursor,
+    isPlaying,
+    handleUndo,
+    handleRedo,
+    handleCopy,
+    handlePaste,
+    selectSlotRange,
+    slotAnchor,
+    togglePlay,
+    stopPlayback,
+    startPlayback,
+    handleInputRest,
+    handleInputTie,
+    handleInputClear,
+    handleToggleOrn,
+    inputString,
+    handleSetInputDiv,
+    handlePrint
+  ]);
+
+  const curSlot = score.measures[cursor.m]?.beats[cursor.b]?.slots[cursor.s] || null;
+  const targetSlot = (lastEnteredSlot && lastEnteredSlot.m === cursor.m && lastEnteredSlot.b === cursor.b && lastEnteredSlot.s === cursor.s)
+    ? score.measures[lastEnteredSlot.m]?.beats[lastEnteredSlot.b]?.slots[lastEnteredSlot.s]
+    : curSlot;
+
+  const currentOrns: Record<string, boolean> = {
+    oshi1: targetSlot?.oshi === 1,
+    oshi2: targetSlot?.oshi === 2,
+    ato: !!targetSlot?.ato,
+    hanashi: !!targetSlot?.hanashi,
+    hikiiro: !!targetSlot?.hikiiro,
+    tsuki: !!targetSlot?.tsuki,
+    yuri: !!targetSlot?.yuri,
+    sukui: !!targetSlot?.sukui,
+    kaki: !!targetSlot?.kaki,
+    hiki: !!targetSlot?.hiki,
+    trem: !!targetSlot?.trem,
+    nagashi: !!targetSlot?.nagashi
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none">
-      {/* Top Header Navigation */}
-      <Header
-        currentScore={currentScore}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        onOpenAiModal={() => setIsAiModalOpen(true)}
-        onOpenPresetModal={() => setIsPresetModalOpen(true)}
-        onExportJson={handleExportJson}
-        onToggleFullscreen={handleToggleFullscreen}
-      />
-
-      {/* Performance & Display Control Bar (Visible in Performance & Edit Modes) */}
-      {viewMode !== 'print' && (
-        <PerformanceToolbar
-          isPlaying={isPlaying}
-          onTogglePlay={() => setIsPlaying(!isPlaying)}
-          onResetPlayback={() => {
-            setIsPlaying(false);
-            setActiveBeatIndex(null);
-          }}
-          bpm={bpm}
-          onBpmChange={(newBpm) => {
-            setBpm(newBpm);
-            setCurrentScore((prev) => ({ ...prev, tempoBpm: newBpm }));
-          }}
-          isMetronomeOn={isMetronomeOn}
-          onToggleMetronome={() => setIsMetronomeOn(!isMetronomeOn)}
-          isAudioOn={isAudioOn}
-          onToggleAudio={() => setIsAudioOn(!isAudioOn)}
-          theme={theme}
-          onThemeChange={setTheme}
-          zoomLevel={zoomLevel}
-          onZoomChange={setZoomLevel}
-          currentScore={currentScore}
-          onTuningChange={(tuning: TuningType) =>
-            setCurrentScore((prev) => ({ ...prev, tuning }))
-          }
-          onPitchKeyChange={(pitchKey: string) =>
-            setCurrentScore((prev) => ({ ...prev, pitchKey }))
-          }
+    <div className="min-h-screen bg-[#edece8] print:bg-white print:min-h-0 text-stone-900 flex flex-col font-sans">
+      <div className="w-full max-w-[1360px] mx-auto p-2 sm:p-3 print:p-0 print:m-0 print:max-w-none flex flex-col gap-2">
+        <Header
+          score={score}
+          onUpdateScoreMeta={meta => mutateScore(d => Object.assign(d, meta))}
+          onUpdateView={view => mutateScore(d => Object.assign(d.view, view))}
+          onOpenLibrary={() => setIsLibraryOpen(true)}
+          onOpenTuning={() => setIsTuningOpen(true)}
+          onOpenExport={() => setIsExportOpen(true)}
+          onOpenHelp={() => setIsHelpOpen(true)}
+          onOpenPracticeMode={() => setIsPracticeMode(true)}
+          onOpenNewScoreWizard={() => setIsNewScoreWizardOpen(true)}
+          onPrint={handlePrint}
         />
-      )}
 
-      {/* Main Score Area */}
-      <main className="flex-1 relative overflow-hidden pb-32">
-        {viewMode === 'print' ? (
-          <PrintScoreView score={currentScore} />
-        ) : (
-          <ScoreViewVertical
-            score={currentScore}
-            theme={theme}
-            viewMode={viewMode}
-            zoomLevel={zoomLevel}
-            selectedCellId={selectedCellId}
-            onSelectCell={handleSelectCell}
-            activeBeatIndex={activeBeatIndex}
-            onNotePlayPreview={(note) => {
-              if (isAudioOn) sanshinSynth.playNote(note);
+        <MeasureNavigator
+          totalMeasures={score.measures.length}
+          currentMeasure={cursor.m}
+          perLine={score.view.perLine}
+          layout={score.view.layout}
+          zoom={score.view.zoom}
+          isFitAll={isFitAll}
+          onSelectMeasure={mIdx => setCursor({ m: mIdx, b: 0, s: 0, low: false })}
+          onAddMeasure={handleAddMeasure}
+          onSetPerLine={perLine => mutateScore(d => (d.view.perLine = perLine))}
+          onToggleFitAll={handleToggleFitAll}
+          onSetZoom100={handleSetZoom100}
+        />
+
+        <main
+          ref={scoreContainerRef}
+          className="w-full rounded-2xl border border-stone-300 bg-[#fdfcf8] p-3 sm:p-6 shadow-md overflow-x-auto overflow-y-auto max-h-[68vh] print:max-h-none print:border-none print:shadow-none print:p-0 print:bg-white touch-pan-x touch-pan-y flex justify-center items-start"
+        >
+          {score.view.layout === 'vertical' ? (
+            <div className="min-w-fit mx-auto flex justify-center">
+              <ScoreSheetVertical
+                score={score}
+                cursor={cursor}
+                currentPlayKey={currentPlayKey}
+                selectedRange={selectedRange}
+                selectedSlotKeys={selectedSlotKeys}
+                onSlotClick={handleSlotClick}
+                onSlotMouseDown={handleSlotMouseDown}
+                onSlotMouseEnter={handleSlotMouseEnter}
+                onSlotMouseUp={handleSlotMouseUp}
+                onMeasureClick={handleMeasureClick}
+                onLyricsChange={handleLyricsChange}
+                onUpdateScoreMeta={meta => mutateScore(d => Object.assign(d, meta))}
+                onInsertMeasure={handleInsertMeasureAt}
+                onDuplicateMeasure={handleDuplicateMeasure}
+                onDeleteMeasure={handleDeleteMeasureAt}
+                onAddMeasure={handleAddMeasure}
+                onSetLoop={(active, a, b) => {
+                  setLoopActive(active);
+                  if (a != null && b != null) setLoopRange([a, b]);
+                }}
+                autoScroll={true}
+              />
+            </div>
+          ) : (
+            <div className="w-full max-w-5xl mx-auto flex justify-center">
+              <ScoreSheetHorizontal
+                score={score}
+                cursor={cursor}
+                currentPlayKey={currentPlayKey}
+                selectedRange={selectedRange}
+                selectedSlotKeys={selectedSlotKeys}
+                onSlotClick={handleSlotClick}
+                onSlotMouseDown={handleSlotMouseDown}
+                onSlotMouseEnter={handleSlotMouseEnter}
+                onSlotMouseUp={handleSlotMouseUp}
+                onMeasureClick={handleMeasureClick}
+                onLyricsChange={handleLyricsChange}
+                onUpdateScoreMeta={meta => mutateScore(d => Object.assign(d, meta))}
+                onInsertMeasure={handleInsertMeasureAt}
+                onDuplicateMeasure={handleDuplicateMeasure}
+                onDeleteMeasure={handleDeleteMeasureAt}
+                onAddMeasure={handleAddMeasure}
+                onSetLoop={(active, a, b) => {
+                  setLoopActive(active);
+                  if (a != null && b != null) setLoopRange([a, b]);
+                }}
+                autoScroll={true}
+              />
+            </div>
+          )}
+        </main>
+
+        <div className="sticky bottom-1 z-30 no-print">
+          <Dock
+            score={score}
+            currentCursor={{ m: cursor.m, b: cursor.b, s: cursor.s }}
+            isPlaying={isPlaying}
+            inputDiv={inputDiv}
+            isChordMode={isChordMode}
+            selectedOrns={currentOrns}
+            currentFinger={targetSlot?.finger}
+            onSetFinger={handleSetFinger}
+            canUndo={undoStackRef.current.length > 0}
+            canRedo={redoStackRef.current.length > 0}
+            loopActive={loopActive}
+            loopRange={loopRange}
+            speed={speed}
+            volume={volume}
+            countIn={countIn}
+            metronome={metronome}
+            onPlayToggle={togglePlay}
+            onStop={stopPlayback}
+            onRewind={() => {
+              stopPlayback();
+              setCursor({ m: 0, b: 0, s: 0 });
             }}
+            onSetInputDiv={handleSetInputDiv}
+            onToggleChordMode={() => setIsChordMode(!isChordMode)}
+            onInputRest={handleInputRest}
+            onInputTie={handleInputTie}
+            onInputRepeat2={handleInputRepeat2}
+            onInputClear={handleInputClear}
+            onToggleOrn={handleToggleOrn}
+            onAddMeasure={handleAddMeasure}
+            onInsertMeasure={handleInsertMeasure}
+            onDeleteMeasure={handleDeleteMeasure}
+            onCopyMeasure={handleCopy}
+            onPasteMeasure={handlePaste}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onStringClick={inputString}
+            onPrevSlot={handlePrevSlot}
+            onNextSlot={handleNextSlot}
+            onSetLoop={(active, a, b) => {
+              setLoopActive(active);
+              if (a != null && b != null) setLoopRange([a, b]);
+            }}
+            onSetSpeed={setSpeed}
+            onSetVolume={v => {
+              setVolume(v);
+              kotoSynth.setVolume(v);
+            }}
+            onSetCountIn={setCountIn}
+            onSetMetronome={setMetronome}
+            onTempoChange={bpm => mutateScore(d => (d.tempo = bpm))}
+            onToggleKotoBoard={() => mutateScore(d => { d.view.showKotoBoard = !d.view.showKotoBoard; })}
           />
-        )}
-      </main>
+        </div>
 
-      {/* Edit Mode Interactive Keyboard / Palette */}
-      {viewMode === 'edit' && (
-        <EditPalette
-          selectedCell={selectedCell}
-          selectedColumnId={selectedColumnId}
-          onUpdateCellNote={handleUpdateCellNote}
-          onUpdateCellTechnique={handleUpdateCellTechnique}
-          onUpdateCellLyric={handleUpdateCellLyric}
-          onClearCell={handleClearCell}
-          onAddColumn={handleAddColumn}
-          onDeleteColumn={handleDeleteColumn}
-          onSelectNextCell={handleSelectNextCell}
-          onSelectPrevCell={handleSelectPrevCell}
-        />
+        {score.view.showKotoBoard && (
+          <div className="no-print mt-1 pb-4">
+            <VirtualKoto
+              score={score}
+              onSelectString={inputString}
+              activeStrings={curSlot?.notes || []}
+              activeSlot={curSlot}
+              onClose={() => mutateScore(d => (d.view.showKotoBoard = false))}
+            />
+          </div>
+        )}
+      </div>
+
+      {selectedSlotKeys.size > 1 && (
+        <div className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 sm:gap-2 rounded-full border border-amber-400 bg-amber-50/95 px-3.5 py-1.5 shadow-xl text-xs font-semibold text-amber-950 backdrop-blur-md no-print transition-all animate-fade-in">
+          <span className="font-bold text-amber-900">選択中: {selectedSlotKeys.size}音</span>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 bg-white hover:bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-md cursor-pointer font-bold text-amber-950 shadow-2xs transition-colors"
+            title="コピー (Ctrl+C)"
+          >
+            コピー (Ctrl+C)
+          </button>
+          <button
+            onClick={handleInputClear}
+            className="flex items-center gap-1 bg-white hover:bg-red-50 border border-red-300 px-2.5 py-0.5 rounded-md cursor-pointer text-red-700 font-bold shadow-2xs transition-colors"
+            title="消去 (Delete)"
+          >
+            消去 (Del)
+          </button>
+          <button
+            onClick={() => setSelectedSlotKeys(new Set())}
+            className="hover:bg-amber-200/80 px-1.5 py-0.5 rounded text-stone-500 hover:text-stone-800 cursor-pointer ml-1 text-sm leading-none"
+            title="選択解除 (Esc)"
+          >
+            ✕
+          </button>
+        </div>
       )}
 
-      {/* Presets Library Modal */}
-      <PresetSelectorModal
-        isOpen={isPresetModalOpen}
-        onClose={() => setIsPresetModalOpen(false)}
-        currentScore={currentScore}
-        savedScores={savedScores}
-        onSelectScore={(score) => {
-          setCurrentScore(score);
-          setBpm(score.tempoBpm || 84);
-        }}
-        onCreateNewScore={handleCreateNewScore}
-        onImportJson={handleImportJson}
-        onDeleteSavedScore={handleDeleteSavedScore}
+      {statusToast && (
+        <div className="fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-50 rounded-full bg-stone-900/95 text-white text-xs font-bold px-4 py-1.5 shadow-xl backdrop-blur-md no-print transition-all animate-fade-in flex items-center gap-1.5 pointer-events-none">
+          <span className="text-amber-400">✨</span> {statusToast}
+        </div>
+      )}
+
+      <TuningModal
+        score={score}
+        isOpen={isTuningOpen}
+        onClose={() => setIsTuningOpen(false)}
+        onUpdateTuning={newTuning => mutateScore(d => (d.tuning = newTuning))}
       />
 
-      {/* AI Generator Modal */}
-      <AiGeneratorModal
-        isOpen={isAiModalOpen}
-        onClose={() => setIsAiModalOpen(false)}
-        onScoreGenerated={(score) => {
-          setCurrentScore(score);
-          setBpm(score.tempoBpm || 84);
+      <ScoreLibraryModal
+        score={score}
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        onLoadScore={s => {
+          pushUndo(score);
+          setScore(s);
+          setCursor({ m: 0, b: 0, s: 0 });
         }}
-        currentScore={currentScore}
+        onOpenNewScoreWizard={() => setIsNewScoreWizardOpen(true)}
       />
+
+      <NewScoreWizardModal
+        isOpen={isNewScoreWizardOpen}
+        onClose={() => setIsNewScoreWizardOpen(false)}
+        onCreateScore={handleCreateScoreFromWizard}
+      />
+
+      <ExportModal
+        score={score}
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        onImportScore={s => {
+          pushUndo(score);
+          setScore(s);
+          setCursor({ m: 0, b: 0, s: 0 });
+        }}
+      />
+
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+
+      {isPracticeMode && (
+        <PracticeModeOverlay
+          score={score}
+          cursor={cursor}
+          currentPlayKey={currentPlayKey}
+          isPlaying={isPlaying}
+          speed={speed}
+          metronome={metronome}
+          loopActive={loopActive}
+          loopRange={loopRange}
+          onPlayToggle={togglePlay}
+          onStop={stopPlayback}
+          onRewind={() => {
+            stopPlayback();
+            setCursor({ m: 0, b: 0, s: 0 });
+          }}
+          onSetSpeed={setSpeed}
+          onSetTempo={bpm => mutateScore(d => (d.tempo = bpm))}
+          onSetMetronome={setMetronome}
+          onSetLoop={(active, a, b) => {
+            setLoopActive(active);
+            if (a != null && b != null) setLoopRange([a, b]);
+          }}
+          onSelectMeasure={mIdx => setCursor({ m: mIdx, b: 0, s: 0, low: false })}
+          onSlotClick={handleSlotClick}
+          onClose={() => setIsPracticeMode(false)}
+          onUpdateScoreMeta={meta => mutateScore(d => Object.assign(d, meta))}
+        />
+      )}
     </div>
   );
 }
