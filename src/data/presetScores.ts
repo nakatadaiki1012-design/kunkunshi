@@ -152,7 +152,89 @@ export function createRyukyuEtudeScore(): KunkunshiScore {
   );
 }
 
+/** 1列（12マス）ずつ書いた工工四を、小節に分ける */
+function columnsToBars(cols: string[][], beatsPerMeasure: number): string[] {
+  const beats = cols.flat();
+  const bars: string[] = [];
+  for (let i = 0; i < beats.length; i += beatsPerMeasure) bars.push(beats.slice(i, i + beatsPerMeasure).join(' '));
+  return bars;
+}
+
+/**
+ * てぃんさぐぬ花（沖縄民謡）本調子。
+ * 工工四は伊禮俊一さんのブログ「沖縄民謡No.11 てぃんさぐぬ花」の工工四（本調子）を参考に、
+ * マス目どおりに写した（1マス＝1拍。線の上に書かれた音は半拍あと）。歌詞は1番。
+ */
+export function createTinsaguScore(): KunkunshiScore {
+  const notes = [
+    ['中', '中.工', '尺.中', '上', '四', '合.老', '四', '工', '中', '中.工', '尺.中', '上'],
+    ['四', '合.老', '四', '工', '中', '中.工', '尺.中', '上', '四', '合.老', '四', '工'],
+    ['中', '中.工', '六', '八', '七', '合', '六', '七', '中', '中.工', '尺.中', '上'],
+    ['四', '合.老', '四', '工', '中', '中.工', '尺.中', '上', '四', '合.老', '四', '工']
+  ];
+  const words = [
+    ['', '', '', '', '', '', '', '', '', '', '', ''],
+    ['', '', '', '', 'てぃ', 'んさ', 'ぐ', 'ぬ', 'は', '', 'な', 'や'],
+    ['ち', 'みさ', 'ち', 'に', 'す', '', 'み', 'てぃ', 'う', 'やぬ', 'ゆ', 'し'],
+    ['ぐ', '', 'とぅ', 'や', 'ち', 'むに', 'す', 'み', 'り', '', '', '']
+  ];
+  const s = buildScore(
+    { id: 'tinsagu', title: 'てぃんさぐぬ花', subtitle: '沖縄民謡', composer: '', tempo: 76 },
+    columnsToBars(notes, 4),
+    columnsToBars(words.map(c => c.map(w => w || '_')), 4)
+  );
+  s.view.perLine = 3;
+  return s;
+}
+
+/**
+ * 安里屋ユンタ（八重山民謡／宮良長包 編曲）本調子・2拍子。
+ * 工工四は伊禮俊一さんのブログ「沖縄民謡No.5 安里屋ユンタ」の工工四（本調子・凡五十四拍子）を参考に、
+ * マス目どおりに写した（1マスに2つある音は、上が拍の頭、線の上が半拍あと）。歌詞は1番。
+ */
+export function createAsadoyaScore(): KunkunshiScore {
+  const notes = [
+    ['四.中', '上.合', '中.上', '合.上', '合.上', '四.中', '上.老', '四', '四.中', '上.合', '中.上', '合.上'],
+    ['合.上', '四.中', '上.老', '四', '四', '上.合', '中.工', '中', '上.老', '四.工', '上.老', '工.合'],
+    ['工.五', '工.合', '工.合', '五', '五.合', '工.合', '五.七', '五.合', '工.中', '上.合', '中.合', '工.中'],
+    ['上.老', '四', '四.中', '上.合', '中.上', '合.上', '合.上', '四.中', '上.老', '四', '四.中', '上.合'],
+    ['中.上', '合.上', '合.上', '四.中', '上.老', '四']
+  ];
+  const words = [
+    ['', '', '', '', '', '', '', '', '', '', '', ''],
+    ['', '', '', '', 'や', 'あ', 'さど', 'や', 'ぬ', 'く', 'や', 'ま'],
+    ['に', 'よ', 'さ', 'ゆい', 'ゆい', 'あ', 'ん', 'ちゅら', 'さ', 'ま', 'り', 'ば'],
+    ['し', 'よ', 'また', 'は', 'りぬ', 'つん', 'だら', 'かぬ', 'しゃま', 'よ', '', ''],
+    ['', '', '', '', '', '']
+  ];
+  const s = buildScore(
+    { id: 'asadoya', title: '安里屋ユンタ', subtitle: '八重山民謡', composer: '', tempo: 100, beatsPerMeasure: 2 },
+    columnsToBars(notes, 2),
+    columnsToBars(words.map(c => c.map(w => w || '_')), 2)
+  );
+  s.view.perLine = 6;
+  return s;
+}
+
 export const PRESET_SONGS: PresetSongInfo[] = [
+  {
+    id: 'tinsagu',
+    title: 'てぃんさぐぬ花',
+    subtitle: '沖縄民謡',
+    composer: '',
+    description: '「親の教えは心に染めなさい」と歌う、いちばん有名な沖縄民謡のひとつ。歌持ち（前奏）と1番。工工四は伊禮俊一さんのブログを参考にしました。',
+    tuningName: '4本 本調子',
+    score: createTinsaguScore
+  },
+  {
+    id: 'asadoya',
+    title: '安里屋ユンタ',
+    subtitle: '八重山民謡',
+    composer: '',
+    description: '「マタハーリヌ ツィンダラ カヌシャマヨ」の囃子でおなじみ。2拍子で、1マスに2つの音が入る練習に。工工四は伊禮俊一さんのブログを参考にしました。',
+    tuningName: '4本 本調子',
+    score: createAsadoyaScore
+  },
   {
     id: 'ryukyu-etude',
     title: '琉球音階の練習',

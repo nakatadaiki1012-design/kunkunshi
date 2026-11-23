@@ -28,7 +28,7 @@ import {
   RIGHT_HAND_ORNS,
   InputDivType
 } from './types/kunkunshi';
-import { createRyukyuEtudeScore } from './data/presetScores';
+import { createTinsaguScore } from './data/presetScores';
 import { sanshinSynth } from './audio/sanshinSynth';
 import { ScorePlayer, PlayerSettings, previewSlot as previewSlotAudio } from './audio/player';
 import { slotOffsetInBeat } from './audio/timeline';
@@ -53,12 +53,12 @@ function loadDraft(): KunkunshiScore {
   try {
     for (const key of [DRAFT_STORAGE_KEY, ...LEGACY_DRAFT_KEYS]) {
       const saved = localStorage.getItem(key);
-      if (saved) return normalizeScore(JSON.parse(saved), createRyukyuEtudeScore());
+      if (saved) return normalizeScore(JSON.parse(saved), createTinsaguScore());
     }
   } catch {
     // 壊れた下書きは無視して見本から始める
   }
-  return createRyukyuEtudeScore();
+  return createTinsaguScore();
 }
 
 const isEmptySlot = (sl: Slot) => !sl.notes.length && !sl.rest && !sl.tie && !sl.repeat1 && !sl.repeat2;
