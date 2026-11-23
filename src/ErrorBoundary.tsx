@@ -31,7 +31,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleReset = () => {
     try {
-      localStorage.removeItem('kotoBunkafu.draft.v7');
+      localStorage.removeItem('kunkunshi.draft.v1');
     } catch {
       // ignore
     }
@@ -47,17 +47,16 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="w-6 h-6" />
             </div>
             <h1 className="text-lg font-bold text-stone-900 mb-2">
-              エラーが発生しました
+              画面の読み込み中にエラーが発生しました
             </h1>
             <p className="text-xs text-stone-600 mb-6 leading-relaxed">
-              アプリケーションの読み込み中に問題が発生しました。初期状態に戻してリロードできます。
+              ブラウザに保存された以前の下書きデータと新しいバージョンの形式が異なっている可能性があります。「初期データで再読込する」を押すと復旧できます。
             </p>
             <button
               onClick={this.handleReset}
               className="flex items-center gap-2 rounded-xl bg-indigo-700 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-600 cursor-pointer transition-all"
             >
-              <RotateCcw className="w-4 h-4" />
-              データをクリアして再起動
+              <RotateCcw className="w-4 h-4" /> 初期データで再読込する
             </button>
             {this.state.error && (
               <details className="mt-4 text-left w-full">

@@ -3,22 +3,58 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { midiToHz, clamp } from '../types/koto';
+import { midiToHz, clamp } from '../types/kunkunshi';
 
 export interface BendConfig {
-  type: 'ato' | 'hanashi' | 'hikiiro' | 'tsuki' | 'yuri';
-  amt?: number; // semitones (1 = half, 2 = whole)
+  type: 'ato' | 'suri' | 'yuri';
+  amt?: number; // semitones
   dur?: number; // duration in seconds
 }
 
 export type StringTriggerCallback = (stringIndex: number) => void;
 
-class KotoSynthesizer {
+/**
+ * 弾いたあとの左手の動きを、再生ピッチの変化（detune）として与える。
+ * 画面再生とWAV書き出しの両方から使う。
+ */
+export function applyBend(ctx: BaseAudioContext, src: AudioBufferSourceNode, t: number, bend: BendConfig): void {
+  const p = src.detune;
+  const d = clamp(bend.dur || 1.0, 0.25, 3.0);
+  const amt = 100 * (bend.amt || 1); // cents
+
+  if (bend.type === 'ato') {
+    // 押し上げ：弾いてから弦を押して音を上げる
+    const t1 = t + clamp(d * 0.35, 0.1, 0.5);
+    p.setValueAtTime(0, t);
+    p.setValueAtTime(0, t1);
+    p.linearRampToValueAtTime(amt, t1 + 0.12);
+  } else if (bend.type === 'suri') {
+    // スリ：下から滑らせてこの高さに入る
+    p.setValueAtTime(-amt, t);
+    p.linearRampToValueAtTime(0, t + clamp(d * 0.25, 0.06, 0.18));
+  } else if (bend.type === 'yuri') {
+    // 揺り：余韻を揺らす（ビブラート）
+    const lfo = ctx.createOscillator();
+    const dep = ctx.createGain();
+    lfo.frequency.value = 5.5;
+    dep.gain.setValueAtTime(0, t);
+    dep.gain.setValueAtTime(0, t + 0.15);
+    dep.gain.linearRampToValueAtTime(30, t + 0.45);
+    lfo.connect(dep);
+    dep.connect(p);
+    lfo.start(t);
+    if (src.buffer) {
+      lfo.stop(t + src.buffer.duration);
+    }
+  }
+}
+
+class SanshinSynthesizer {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private inputGain: GainNode | null = null;
   private bufferCache = new Map<string, AudioBuffer>();
-  private activeVoices: ({ src: AudioBufferSourceNode; gain: GainNode } | null)[] = new Array(17).fill(null);
+  private activeVoices: (({ src: AudioBufferSourceNode; gain: GainNode } | null))[] = new Array(17).fill(null);
   private volume: number = 0.8;
   private stringListeners: Set<StringTriggerCallback> = new Set();
 
@@ -26,6 +62,7 @@ class KotoSynthesizer {
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       this.ctx = new AudioCtx();
+
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.volume;
 
@@ -40,19 +77,19 @@ class KotoSynthesizer {
       hp.type = 'highpass';
       hp.frequency.value = 70;
 
-      // Resonant body peak (~280Hz)
+      // 胴鳴り（蛇皮を張った胴の響き 230Hz）
       const bodyFilter = this.ctx.createBiquadFilter();
       bodyFilter.type = 'peaking';
-      bodyFilter.frequency.value = 280;
-      bodyFilter.Q.value = 1.2;
-      bodyFilter.gain.value = 3.5;
+      bodyFilter.frequency.value = 230;
+      bodyFilter.Q.value = 1.1;
+      bodyFilter.gain.value = 4.5;
 
-      // Presence / Ivory pick overtone (~2600Hz)
+      // 皮のサワリ・爪の硬い音（1800Hz）
       const presenceFilter = this.ctx.createBiquadFilter();
       presenceFilter.type = 'peaking';
-      presenceFilter.frequency.value = 2600;
-      presenceFilter.Q.value = 1.0;
-      presenceFilter.gain.value = 2.0;
+      presenceFilter.frequency.value = 1800;
+      presenceFilter.Q.value = 0.9;
+      presenceFilter.gain.value = 3.0;
 
       this.inputGain = this.ctx.createGain();
       this.inputGain.gain.value = 1.0;
@@ -64,10 +101,17 @@ class KotoSynthesizer {
       compressor.connect(this.masterGain);
       this.masterGain.connect(this.ctx.destination);
     }
+
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
+
     return this.ctx;
+  }
+
+  /** 音を出すタイミングの基準になる現在時刻（秒） */
+  public now(): number {
+    return this.ensureContext().currentTime;
   }
 
   public getContext(): AudioContext | null {
@@ -97,14 +141,15 @@ class KotoSynthesizer {
   }
 
   /**
-   * Karplus-Strong physical modeling of a plucked koto silk/tetron string
+   * 三線の弦を爪（バチ）で弾いた音を、Karplus-Strong 方式で作る
    */
   public renderStringSample(ctx: BaseAudioContext, midi: number, bright: number = 0.85): AudioBuffer {
     const sr = ctx.sampleRate;
     const f = midiToHz(midi);
-    // Koto string decay: low strings ring longer, high strings decay faster
-    const T60 = clamp(4.0 - (midi - 50) * 0.08, 1.2, 5.0);
-    const len = Math.min(sr * 4.5, Math.ceil(sr * T60));
+
+    // 三線は箏より響きが短い。低い音ほど長く響く
+    const T60 = clamp(2.6 - (midi - 48) * 0.05, 0.9, 3.0);
+    const len = Math.min(sr * 3.2, Math.ceil(sr * T60));
     const out = new Float32Array(len);
 
     const S = 0.42; // Low-pass damping coefficient inside the delay loop
@@ -115,9 +160,9 @@ class KotoSynthesizer {
       N -= 1;
       frac += 1;
     }
+
     const C = (1 - frac) / (1 + frac);
     const rho = Math.pow(0.001, 1 / (T60 * f));
-
     const delayLine = new Float32Array(N);
 
     // Excitation: noise burst filtered to model pluck angle & distance from bridge
@@ -129,15 +174,14 @@ class KotoSynthesizer {
       raw[i] = lp;
     }
 
-    // Comb filter: striking near the Ryukaku bridge (~13% along active string)
-    const d = Math.max(1, Math.round(N * 0.13));
+    // 駒（ウマ）の近くを弾く（弦の長さの約10%の位置）
+    const d = Math.max(1, Math.round(N * 0.1));
     let mean = 0;
     for (let i = 0; i < N; i++) {
       delayLine[i] = raw[i] - 0.9 * raw[(i - d + N) % N];
       mean += delayLine[i];
     }
     mean /= N;
-
     let peak = 1e-6;
     for (let i = 0; i < N; i++) {
       delayLine[i] -= mean;
@@ -161,17 +205,16 @@ class KotoSynthesizer {
       const y = C * filt + apX - C * apY;
       apX = filt;
       apY = y;
-
       delayLine[idx] = y;
       idx = (idx + 1) % N;
     }
 
-    // Tsume (plectrum/claw) attack transient
+    // 爪（バチ）が弦に当たる音
     const clickLen = Math.floor(sr * 0.006);
     let c = 0;
     for (let n = 0; n < clickLen && n < len; n++) {
       c += 0.6 * ((Math.random() * 2 - 1) - c);
-      out[n] += c * 0.35 * bright * (1 - n / clickLen);
+      out[n] += c * 0.45 * bright * (1 - n / clickLen);
     }
 
     // Peak normalize & click-free envelope
@@ -207,61 +250,22 @@ class KotoSynthesizer {
     return this.bufferCache.get(key)!;
   }
 
-  private applyBend(src: AudioBufferSourceNode, t: number, bend: BendConfig): void {
-    const p = src.detune;
-    const d = clamp(bend.dur || 1.0, 0.25, 3.0);
-    const amt = 100 * (bend.amt || 1); // cents
-
-    if (bend.type === 'ato') {
-      const t1 = t + clamp(d * 0.35, 0.1, 0.5);
-      p.setValueAtTime(0, t);
-      p.setValueAtTime(0, t1);
-      p.linearRampToValueAtTime(amt, t1 + 0.12);
-    } else if (bend.type === 'hanashi') {
-      const t1 = t + clamp(d * 0.4, 0.12, 0.6);
-      p.setValueAtTime(amt, t);
-      p.setValueAtTime(amt, t1);
-      p.linearRampToValueAtTime(0, t1 + 0.1);
-    } else if (bend.type === 'hikiiro') {
-      p.setValueAtTime(0, t);
-      p.setValueAtTime(0, t + 0.15);
-      p.linearRampToValueAtTime(-70, t + 0.32);
-      p.linearRampToValueAtTime(0, t + 0.55);
-    } else if (bend.type === 'tsuki') {
-      p.setValueAtTime(0, t);
-      p.setValueAtTime(0, t + 0.09);
-      p.linearRampToValueAtTime(100, t + 0.14);
-      p.linearRampToValueAtTime(0, t + 0.24);
-    } else if (bend.type === 'yuri') {
-      if (!this.ctx) return;
-      const lfo = this.ctx.createOscillator();
-      const dep = this.ctx.createGain();
-      lfo.frequency.value = 5.2;
-      dep.gain.setValueAtTime(0, t);
-      dep.gain.setValueAtTime(0, t + 0.2);
-      dep.gain.linearRampToValueAtTime(28, t + 0.5);
-      lfo.connect(dep);
-      dep.connect(p);
-      lfo.start(t);
-      if (src.buffer) {
-        lfo.stop(t + src.buffer.duration);
-      }
-    }
-  }
-
   public pluck(
     strIndex: number,
     midi: number,
     time: number = 0,
     vel: number = 0.8,
     bright: number = 0.85,
-    bend: BendConfig | null = null
+    bend: BendConfig | null = null,
+    pan: number | null = null
   ) {
     const ctx = this.ensureContext();
     const t = Math.max(time, ctx.currentTime);
 
+    // Notify listeners that this string is plucked
     this.notifyStringTrigger(strIndex);
 
+    // Damp previously vibrating string on this physical string
     const old = this.activeVoices[strIndex];
     if (old) {
       this.dampVoice(old, t, 0.03);
@@ -269,19 +273,21 @@ class KotoSynthesizer {
 
     const src = ctx.createBufferSource();
     src.buffer = this.getBuffer(midi, bright);
+
     if (bend && src.detune) {
-      this.applyBend(src, t, bend);
+      applyBend(ctx, src, t, bend);
     }
 
     const g = ctx.createGain();
     g.gain.value = vel;
 
+    // 男弦を少し左、女弦を少し右に
     if (ctx.createStereoPanner) {
-      const pan = ctx.createStereoPanner();
-      pan.pan.value = ((strIndex - 6) / 6) * 0.32;
+      const panner = ctx.createStereoPanner();
+      panner.pan.value = (pan ?? (strIndex - 1) * 0.35) * 0.32;
       src.connect(g);
-      g.connect(pan);
-      if (this.inputGain) pan.connect(this.inputGain);
+      g.connect(panner);
+      if (this.inputGain) panner.connect(this.inputGain);
     } else {
       src.connect(g);
       if (this.inputGain) g.connect(this.inputGain);
@@ -296,6 +302,7 @@ class KotoSynthesizer {
         this.activeVoices[strIndex] = null;
       }
     };
+
     return voice;
   }
 
@@ -308,17 +315,30 @@ class KotoSynthesizer {
     }
   }
 
-  public dampAll(t: number = 0) {
+  /** 指定した弦の響きを止める（消音・休符用） */
+  public damp(strIndex: number, t: number = 0, tc: number = 0.04) {
+    if (!this.ctx) return;
+    const v = this.activeVoices[strIndex];
+    if (v) {
+      this.dampVoice(v, Math.max(t, this.ctx.currentTime), tc);
+      this.activeVoices[strIndex] = null;
+    }
+  }
+
+  public dampAll(t: number = 0, tc: number = 0.05) {
     if (!this.ctx) return;
     const now = Math.max(t, this.ctx.currentTime);
     this.activeVoices.forEach((v, i) => {
       if (v) {
-        this.dampVoice(v, now, 0.05);
+        this.dampVoice(v, now, tc);
         this.activeVoices[i] = null;
       }
     });
   }
 
+  /**
+   * Hyoshigi (拍子木) wooden clapper click for count-in and metronome
+   */
   public click(t: number, accent: boolean = false) {
     const ctx = this.ensureContext();
     const o = ctx.createOscillator();
@@ -335,7 +355,6 @@ class KotoSynthesizer {
     if (this.masterGain) {
       g.connect(this.masterGain);
     }
-
     o.start(t);
     o.stop(t + 0.08);
   }
@@ -347,7 +366,6 @@ class KotoSynthesizer {
       [p + 1, 0.85],
       [p + 2, 0.85]
     ]);
-
     const step = () => {
       const t0 = performance.now();
       while (list.length && performance.now() - t0 < 8) {
@@ -364,4 +382,4 @@ class KotoSynthesizer {
   }
 }
 
-export const kotoSynth = new KotoSynthesizer();
+export const sanshinSynth = new SanshinSynthesizer();

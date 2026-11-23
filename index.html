@@ -2,19 +2,59 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>工工四エディタ Pro - 沖縄三線スコア作成・編集＆演奏ビューア</title>
-    <meta name="description" content="沖縄三線の工工四（クンクンシー）を簡単編集・保存・ステージ演奏で視認しやすい高コントラストビューアアプリ。" />
-    <meta property="og:title" content="工工四エディタ Pro - 沖縄三線スコア作成・編集＆演奏ビューア" />
-    <meta property="og:description" content="沖縄三線の工工四（クンクンシー）を簡単編集・保存・ステージ演奏で視認しやすい高コントラストビューアアプリ。" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>工工四エディタ | 沖縄三線の楽譜（縦書き工工四・タブ譜）を無料でブラウザ作成・再生・印刷</title>
+    <meta name="description" content="沖縄三線の楽譜「工工四（くんくんしー）」を、インストール不要・無料でブラウザ上で作成。作文用紙のような縦書きの工工四と、3本線のタブ譜を切り替え可能。再生、WAV・MIDI・Excel書き出し、A4印刷・PDF保存に対応。" />
+    <meta name="keywords" content="工工四,くんくんしー,三線,沖縄,楽譜作成,タブ譜,縦書き,勘所,本調子,二揚げ,三下げ,MIDI,PDF,無料" />
+    <link rel="canonical" href="https://nakatadaiki1012-design.github.io/kunkunshi/" />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#1c1917" />
+    <meta name="application-name" content="工工四エディタ" />
+    <meta property="og:site_name" content="工工四エディタ" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:title" content="工工四エディタ | 沖縄三線の楽譜を無料でブラウザ作成" />
+    <meta property="og:description" content="縦書きの工工四とタブ譜を作って、聴いて、印刷できる無料ツール。WAV・MIDI・Excel書き出し対応。" />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:url" content="https://nakatadaiki1012-design.github.io/kunkunshi/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="工工四エディタ | 沖縄三線の楽譜を無料でブラウザ作成" />
+    <meta name="twitter:description" content="縦書きの工工四とタブ譜を作って、聴いて、印刷できる無料ツール。" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "工工四エディタ",
+      "alternateName": "Kunkunshi Editor",
+      "url": "https://nakatadaiki1012-design.github.io/kunkunshi/",
+      "description": "沖縄三線の工工四（縦書き）とタブ譜を、ブラウザ上で作成・再生・印刷・WAV/MIDI書き出しできる無料の楽譜エディタ。",
+      "applicationCategory": "MusicApplication",
+      "operatingSystem": "Any (Web browser)",
+      "inLanguage": "ja",
+      "browserRequirements": "Requires JavaScript and Web Audio API",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
+      "keywords": "工工四, くんくんしー, 三線, 沖縄, 楽譜作成, タブ譜, 縦書き"
+    }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&family=Noto+Serif+JP:wght@500;700;900&family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@500;700&family=Klee+One:wght@600&family=Noto+Serif+JP:wght@600;800&family=Shippori+Mincho+B1:wght@500;700;800&family=Yuji+Boku&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
   </head>
-  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-950 font-sans">
-    <div id="root"></div>
+  <body class="bg-stone-100 text-stone-900 antialiased selection:bg-indigo-100 selection:text-indigo-900">
+    <div id="root">
+      <main style="max-width:720px;margin:0 auto;padding:24px;font-family:sans-serif;line-height:1.8;color:#222">
+        <h1>工工四エディタ</h1>
+        <p>沖縄三線の楽譜<strong>「工工四（くんくんしー）」</strong>を、インストール不要・無料でブラウザ上で作成・再生・編集・印刷できる楽譜エディタです。</p>
+        <ul>
+          <li>作文用紙のようなマス目の<strong>縦書き工工四</strong>と、3本線の<strong>タブ譜</strong>をボタンひとつで切り替え</li>
+          <li>勘所（合・乙・老・四・上・中・尺・工・五・六・七・八・九）をボタンやキーボードで入力。ドレミのルビ表示に対応</li>
+          <li>本調子・二揚げ・三下げ・一揚げなどの調子と、高さ（1本〜12本）の設定</li>
+          <li>スクイ・打・掛・押し上げ・スリ・揺りなどの奏法記号、合わせ（2本同時）、歌詞</li>
+          <li>三線の音での再生、WAV・MIDI・Excel書き出し、A4印刷・PDF保存、JSON保存</li>
+        </ul>
+        <p>このページはJavaScriptで動作します。ブラウザのJavaScriptを有効にしてください。</p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -3,213 +3,443 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { KunkunshiScore, ViewMode } from '../types/kunkunshi';
-import { exportAppFilesZip } from '../utils/zipExport';
+import React, { useState, useEffect } from 'react';
+import { KunkunshiScore, getTuningLabel, TEMPO_MIN, TEMPO_MAX, TUNING_PRESETS, honOfRoot } from '../types/kunkunshi';
 import {
   Music,
   Sliders,
   FolderOpen,
   Download,
   HelpCircle,
-  Play,
-  Edit3,
-  Printer,
-  Sparkles,
-  Maximize2,
-  FilePlus,
-  Package,
-  Loader2,
-  Settings2,
+  Eye,
+  ZoomIn,
+  ZoomOut,
+  Type,
   ChevronDown,
   ChevronUp,
-  ZoomIn,
-  ZoomOut
+  Settings2,
+  Maximize2,
+  Printer,
+  FilePlus
 } from 'lucide-react';
 
 interface HeaderProps {
-  currentScore: KunkunshiScore;
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
-  onOpenAiModal: () => void;
-  onOpenPresetModal: () => void;
-  onOpenTuningModal: () => void;
-  onOpenNewScoreModal: () => void;
-  onOpenHelpModal: () => void;
-  onExportJson: () => void;
-  onToggleFullscreen: () => void;
+  score: KunkunshiScore;
   onUpdateScoreMeta: (meta: Partial<KunkunshiScore>) => void;
+  onUpdateView: (view: Partial<KunkunshiScore['view']>) => void;
+  onOpenLibrary: () => void;
+  onOpenTuning: () => void;
+  onOpenExport: () => void;
+  onOpenHelp: () => void;
+  onOpenPracticeMode?: () => void;
+  onOpenNewScoreWizard?: () => void;
+  onPrint?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  currentScore,
-  viewMode,
-  setViewMode,
-  onOpenAiModal,
-  onOpenPresetModal,
-  onOpenTuningModal,
-  onOpenNewScoreModal,
-  onOpenHelpModal,
-  onExportJson,
-  onToggleFullscreen,
-  onUpdateScoreMeta
+  score,
+  onUpdateScoreMeta,
+  onUpdateView,
+  onOpenLibrary,
+  onOpenTuning,
+  onOpenExport,
+  onOpenHelp,
+  onOpenPracticeMode,
+  onOpenNewScoreWizard,
+  onPrint
 }) => {
   const [showOptions, setShowOptions] = useState(false);
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [tempoText, setTempoText] = useState(String(score.tempo));
+  // 他の場所（演奏モード・元に戻すなど）でテンポが変わったら入力欄にも反映する
+  useEffect(() => {
+    setTempoText(String(score.tempo));
+  }, [score.tempo]);
+  const view = score.view;
 
-  const handleDownloadAppZip = async () => {
-    try {
-      setIsDownloadingZip(true);
-      const blob = await exportAppFilesZip(currentScore);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'kunkunshi-editor-app-files.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e: any) {
-      alert('ZIP出力エラー: ' + (e?.message || ''));
-    } finally {
-      setIsDownloadingZip(false);
-    }
+  const handleZoom = (delta: number) => {
+    const nextZoom = Math.min(1.5, Math.max(0.65, Math.round((view.zoom + delta) * 100) / 100));
+    onUpdateView({ zoom: nextZoom });
   };
 
   return (
-    <header className="sticky top-0 z-30 flex flex-col gap-1.5 px-4 py-2.5 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-slate-100 shadow-md">
-      {/* Top Header Zone */}
-      <div className="flex items-center justify-between gap-4">
-        {/* Brand & Song Title */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 font-black text-lg shadow-sm font-serif">
-              工
-            </div>
-            <span className="text-base font-bold tracking-tight text-amber-400 whitespace-nowrap shrink-0 font-serif">
-              工工四エディタ Pro
-            </span>
+    <header className="flex flex-col gap-1.5 rounded-xl border border-stone-200/90 bg-white/95 px-2.5 sm:px-3 py-1 sm:py-1.5 shadow-2xs backdrop-blur-md no-print transition-all">
+      {/* Top row: Brand & Primary Modals */}
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <div className="flex items-center gap-1.5" title="工工四エディタ">
+          <div className="flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-800 to-amber-950 text-white shadow-xs">
+            <span className="font-score font-extrabold text-xs sm:text-sm">工</span>
           </div>
-
-          <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-slate-700 text-xs text-slate-300">
-            <Music className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <span className="font-score font-bold text-xs text-stone-700 hidden md:inline">工工四エディタ</span>
+          <div className="flex items-center gap-1">
             <input
               type="text"
-              value={currentScore.title}
+              value={score.title}
               onChange={e => onUpdateScoreMeta({ title: e.target.value })}
-              className="bg-transparent font-bold text-slate-100 focus:outline-none focus:border-b focus:border-amber-400 font-serif text-sm max-w-[180px]"
               placeholder="曲名を入力"
+              className="font-score font-extrabold text-xs sm:text-sm text-stone-900 border-b border-transparent hover:border-stone-300 focus:border-indigo-500 focus:outline-none bg-transparent max-w-[110px] sm:max-w-[200px] py-0.5"
             />
-            <span className="text-amber-400 font-mono">({currentScore.pitchKey})</span>
+            <span className="rounded bg-amber-100/80 px-1 py-0.2 font-mono text-[9px] font-bold text-amber-900 shrink-0">
+              {score.tuning.preset === 'custom' ? 'カスタム' : `${honOfRoot(score.tuning.root)} ${TUNING_PRESETS[score.tuning.preset]?.name || ''}`}
+            </span>
           </div>
         </div>
 
-        {/* View Mode Buttons */}
-        <nav className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-lg border border-slate-800">
+        {/* 楽譜の形の切り替え（作文用紙のような縦書き ／ タブ譜） */}
+        <div className="inline-flex rounded-lg border border-stone-300 bg-stone-100 p-0.5 shrink-0" role="group" aria-label="楽譜の形">
           <button
-            onClick={() => setViewMode('performance')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-              viewMode === 'performance'
-                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            onClick={() => onUpdateView({ layout: 'vertical' })}
+            className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              view.layout === 'vertical' ? 'bg-white text-stone-900 shadow-2xs font-bold' : 'text-stone-500 hover:text-stone-900'
             }`}
-            title="演奏・視認特化モード"
+            title="昔からの工工四（作文用紙のようなマス目・縦書き・右から左へ）"
           >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>演奏モード</span>
+            縦書き工工四
           </button>
-
           <button
-            onClick={() => setViewMode('edit')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-              viewMode === 'edit'
-                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            onClick={() => onUpdateView({ layout: 'tab' })}
+            className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              view.layout === 'tab' ? 'bg-white text-stone-900 shadow-2xs font-bold' : 'text-stone-500 hover:text-stone-900'
             }`}
-            title="工工四の編集"
+            title="3本の線（上から 女弦・中弦・男弦）に勘所を書くタブ譜（横書き・左から右へ）"
           >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>編集モード</span>
+            タブ譜
+          </button>
+        </div>
+
+        {/* Modal & Options Buttons */}
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {onOpenNewScoreWizard && (
+            <button
+              onClick={onOpenNewScoreWizard}
+              className="flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-950 px-2 py-0.5 sm:py-1 text-xs font-bold shadow-2xs cursor-pointer shrink-0 whitespace-nowrap transition-colors"
+              title="空白の楽譜を新しく作成する (Ctrl+N)"
+              aria-label="空白の楽譜を新しく作成する (Ctrl+N)"
+            >
+              <FilePlus className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-700 shrink-0" />
+              <span className="hidden sm:inline">新規楽譜</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenLibrary}
+            className="flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-2 py-0.5 sm:py-1 text-xs font-semibold text-stone-700 hover:bg-stone-100 cursor-pointer shrink-0 whitespace-nowrap"
+            title="楽曲ライブラリ"
+              aria-label="楽曲ライブラリ"
+          >
+            <FolderOpen className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-700 shrink-0" />
+            <span className="hidden sm:inline">楽曲集</span>
           </button>
 
           <button
-            onClick={() => setViewMode('print')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-              viewMode === 'print'
-                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            onClick={onOpenTuning}
+            className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50/80 px-2 py-0.5 sm:py-1 text-xs font-semibold text-amber-950 hover:bg-amber-100 cursor-pointer shrink-0 whitespace-nowrap"
+            title="調弦設定"
+              aria-label="調弦設定"
+          >
+            <Sliders className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-700 shrink-0" />
+            <span className="hidden sm:inline">調弦</span>
+          </button>
+
+          {onOpenPracticeMode && (
+            <button
+              onClick={onOpenPracticeMode}
+              className="flex items-center gap-1 rounded-md bg-amber-500 hover:bg-amber-400 text-stone-950 px-2 sm:px-2.5 py-0.5 sm:py-1 text-xs font-bold shadow-2xs transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+              title="演奏・練習モード（全画面で譜面を大きく集中表示）"
+            >
+              <Maximize2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+              <span>演奏</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenExport}
+            className="flex items-center gap-1 rounded-md bg-indigo-700 px-2 sm:px-2.5 py-0.5 sm:py-1 text-xs font-bold text-white shadow-2xs hover:bg-indigo-600 cursor-pointer shrink-0 whitespace-nowrap"
+            title="保存・WAV/MIDI書き出し・詳細出力"
+          >
+            <Download className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+            <span>保存</span>
+          </button>
+
+          {onPrint && (
+            <button
+              onClick={onPrint}
+              className="flex items-center gap-1 rounded-md border border-stone-300 bg-white px-2 py-0.5 sm:py-1 text-xs font-bold text-stone-800 shadow-2xs hover:bg-stone-100 cursor-pointer shrink-0 whitespace-nowrap"
+              title="印刷画面・PDF保存プレビューを開く (Ctrl+P)"
+              aria-label="印刷画面・PDF保存プレビューを開く (Ctrl+P)"
+            >
+              <Printer className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-stone-700 shrink-0" />
+              <span className="hidden sm:inline">印刷</span>
+            </button>
+          )}
+
+          {/* Settings / View options expand toggle */}
+          <button
+            onClick={() => setShowOptions(!showOptions)}
+            className={`flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 sm:py-1 text-xs font-semibold transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
+              showOptions
+                ? 'border-indigo-400 bg-indigo-50 text-indigo-900'
+                : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
             }`}
-            title="印刷・PDF用"
+            title="表示設定・詳細切り替え"
+              aria-label="表示設定・詳細切り替え"
           >
-            <Printer className="w-3.5 h-3.5" />
-            <span>印刷モード</span>
-          </button>
-        </nav>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={onOpenNewScoreModal}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            title="新規工工四スコアを作成"
-          >
-            <FilePlus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">新規</span>
+            <Settings2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+            <span className="hidden md:inline">設定</span>
+            {showOptions ? <ChevronUp className="h-2.5 w-2.5 shrink-0" /> : <ChevronDown className="h-2.5 w-2.5 shrink-0" />}
           </button>
 
           <button
-            onClick={onOpenPresetModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors border border-slate-700 whitespace-nowrap shrink-0 cursor-pointer"
-            title="既存の工工四データ読み込み / ライブラリ"
-          >
-            <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline">曲ライブラリ</span>
-          </button>
-
-          <button
-            onClick={onOpenTuningModal}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg transition-colors border border-slate-700 whitespace-nowrap shrink-0 cursor-pointer"
-            title="調子（本調子・二揚げ・三揚げ）設定"
-          >
-            <Sliders className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">調子</span>
-          </button>
-
-          <button
-            onClick={onOpenAiModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-slate-950 rounded-lg shadow-sm transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            title="AIで工工四自動生成"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">AI工工四作成</span>
-          </button>
-
-          <button
-            onClick={handleDownloadAppZip}
-            disabled={isDownloadingZip}
-            className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-            title="ソースコードZIP保存"
-          >
-            {isDownloadingZip ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Package className="w-4 h-4" />}
-          </button>
-
-          <button
-            onClick={onToggleFullscreen}
-            className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-            title="全画面表示"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={onOpenHelpModal}
-            className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            onClick={onOpenHelp}
+            className="flex items-center justify-center rounded-md border border-stone-200 bg-white p-1 text-stone-600 hover:bg-stone-100 cursor-pointer shrink-0"
             title="ヘルプ"
+              aria-label="ヘルプ"
           >
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
           </button>
         </div>
       </div>
+
+      {/* Collapsible Options & View Mode Toggles */}
+      {showOptions && (
+        <div className="flex flex-col gap-2 border-t border-stone-200 pt-2 text-xs text-stone-700 animate-in fade-in-50 duration-150">
+          {/* Metadata: Tempo, Time signature, Subtitle, Composer */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-stone-400">テンポ:</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={TEMPO_MIN}
+                max={TEMPO_MAX}
+                value={tempoText}
+                onChange={e => {
+                  setTempoText(e.target.value);
+                  const n = Number(e.target.value);
+                  // 入力の途中（空・桁が足りない）では反映せず、範囲内の整数になったら反映する
+                  if (Number.isInteger(n) && n >= TEMPO_MIN && n <= TEMPO_MAX) onUpdateScoreMeta({ tempo: n });
+                }}
+                onBlur={() => setTempoText(String(score.tempo))}
+                aria-label="テンポ"
+                className="w-14 rounded-md border border-stone-300 bg-white px-1.5 py-1 text-center font-bold text-stone-900 focus:outline-indigo-500 text-xs"
+              />
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold text-stone-400">拍子:</span>
+              <select
+                value={score.beatsPerMeasure}
+                onChange={e => onUpdateScoreMeta({ beatsPerMeasure: Number(e.target.value) as any })}
+                className="rounded-md border border-stone-300 bg-white px-2 py-1 font-semibold text-stone-800 text-xs"
+              >
+                <option value="4">4/4 拍子</option>
+                <option value="3">3/4 拍子</option>
+                <option value="2">2/4 拍子</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1 flex-1 min-w-[130px]">
+              <span className="text-[11px] font-semibold text-stone-400">副題:</span>
+              <input
+                type="text"
+                value={score.subtitle}
+                onChange={e => onUpdateScoreMeta({ subtitle: e.target.value })}
+                placeholder="副題"
+                className="w-full rounded-md border border-stone-300 bg-white px-2 py-1 text-stone-800 text-xs"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 flex-1 min-w-[130px]">
+              <span className="text-[11px] font-semibold text-stone-400">作曲者:</span>
+              <input
+                type="text"
+                value={score.composer}
+                onChange={e => onUpdateScoreMeta({ composer: e.target.value })}
+                placeholder="作曲・編曲"
+                className="w-full rounded-md border border-stone-300 bg-white px-2 py-1 text-stone-800 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* View Toggles: Vertical / Horizontal, Kanji / Arabic, Ruby, Zoom */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* タブ譜の線の上に書く文字 */}
+              {view.layout === 'tab' && (
+                <div className="inline-flex rounded-lg border border-stone-200 bg-stone-100 p-0.5" title="タブ譜の線の上に書く文字">
+                  <button
+                    onClick={() => onUpdateView({ tabLabel: 'kanji' })}
+                    className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer ${
+                      view.tabLabel !== 'doremi' ? 'bg-white text-stone-900 shadow-2xs font-bold' : 'text-stone-500 hover:text-stone-900'
+                    }`}
+                  >
+                    工工四の字
+                  </button>
+                  <button
+                    onClick={() => onUpdateView({ tabLabel: 'doremi' })}
+                    className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer ${
+                      view.tabLabel === 'doremi' ? 'bg-white text-stone-900 shadow-2xs font-bold' : 'text-stone-500 hover:text-stone-900'
+                    }`}
+                  >
+                    ドレミ
+                  </button>
+                </div>
+              )}
+
+              {/* Ruby */}
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-semibold text-stone-400">ルビ:</span>
+                <select
+                  value={view.ruby}
+                  onChange={e => onUpdateView({ ruby: e.target.value as any })}
+                  className="rounded-md border border-stone-300 bg-white px-1.5 py-0.5 text-xs font-medium text-stone-700"
+                >
+                  <option value="off">非表示</option>
+                  <option value="doremi">ドレミ</option>
+                  <option value="cde">CDE</option>
+                </select>
+              </div>
+
+              {/* Measures per line */}
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-semibold text-stone-400">1段:</span>
+                <select
+                  value={view.perLine}
+                  onChange={e => onUpdateView({ perLine: Number(e.target.value) })}
+                  className="rounded-md border border-stone-300 bg-white px-1.5 py-0.5 text-xs font-medium text-stone-700"
+                >
+                  {[1, 2, 3, 4, 6, 8].map(n => (
+                    <option key={n} value={n}>
+                      {n}小節
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Paper orientation for printing */}
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-semibold text-stone-400">用紙:</span>
+                <select
+                  value={view.paper}
+                  onChange={e => onUpdateView({ paper: e.target.value as 'portrait' | 'landscape' })}
+                  className="rounded-md border border-stone-300 bg-white px-1.5 py-0.5 text-xs font-medium text-stone-700 cursor-pointer"
+                  title="印刷するときのA4の向き"
+                >
+                  <option value="portrait">A4 縦</option>
+                  <option value="landscape">A4 横</option>
+                </select>
+              </div>
+
+              {/* Tuning chart on the score */}
+              <button
+                onClick={() => onUpdateView({ chart: view.chart === 'on' ? 'off' : 'on' })}
+                className={`rounded-md border px-2 py-0.5 text-xs font-semibold cursor-pointer transition-colors ${
+                  view.chart === 'on'
+                    ? 'border-amber-400 bg-amber-50 text-amber-900'
+                    : 'border-stone-200 bg-white text-stone-500 hover:text-stone-800'
+                }`}
+                title="譜面に調弦（3本の弦の音名）を載せる"
+              >
+                調弦表
+              </button>
+
+              {/* Font selection */}
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-semibold text-stone-400">書体:</span>
+                <select
+                  value={view.fontStyle || 'shippori'}
+                  onChange={e => onUpdateView({ fontStyle: e.target.value as any })}
+                  className="rounded-md border border-stone-300 bg-white px-1.5 py-0.5 text-xs font-medium text-stone-700 cursor-pointer"
+                >
+                  <option value="shippori">しっぽり明朝（工工四らしい）</option>
+                  <option value="kaisei">解星デコール（優美）</option>
+                  <option value="yuji">游築・筆文字（古典風格）</option>
+                  <option value="klee">クレー（教科書筆記）</option>
+                  <option value="noto">Noto Serif（標準明朝）</option>
+                </select>
+              </div>
+
+              {/* 16th note layout (縦4段: 8分音符より縦に小さく表示 / 2x2分割) */}
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-semibold text-stone-400">16分:</span>
+                <select
+                  value={view.sixteenthLayout || 'vertical'}
+                  onChange={e => onUpdateView({ sixteenthLayout: e.target.value as any })}
+                  className="rounded-md border border-stone-300 bg-white px-1.5 py-0.5 text-xs font-medium text-stone-700 cursor-pointer"
+                  title="16分音符の配置方式"
+                >
+                  <option value="vertical">縦4段（8分より縦に小さい）</option>
+                  <option value="grid">2×2（横分割）</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Right: 仮想三線, Lyrics, Zoom */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onUpdateView({ showSanshinBoard: !view.showSanshinBoard })}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold cursor-pointer border transition-colors ${
+                  view.showSanshinBoard
+                    ? 'border-amber-400 bg-amber-50 text-amber-900 font-bold'
+                    : 'border-stone-200 bg-white text-stone-500 hover:text-stone-800'
+                }`}
+                title="ページ最下部に三線の棹（勘所）を表示・非表示"
+              >
+                <Music className="h-3 w-3" />
+                <span>仮想三線</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onUpdateView({ showLyrics: !view.showLyrics })}
+                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold cursor-pointer border transition-colors ${
+                    view.showLyrics
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-900 font-bold'
+                      : 'border-stone-200 bg-white text-stone-500 hover:text-stone-800'
+                  }`}
+                  title="歌詞の表示・非表示を切り替え"
+                >
+                  <Type className="h-3 w-3" />
+                  <span>歌詞</span>
+                </button>
+                {view.showLyrics && (
+                  <button
+                    onClick={() =>
+                      onUpdateView({
+                        lyricsPosition: view.lyricsPosition === 'bottom' ? 'right' : 'bottom'
+                      })
+                    }
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold border border-indigo-200 bg-white text-indigo-800 hover:bg-indigo-50 cursor-pointer shadow-2xs"
+                    title="歌詞の位置を切り替え（マスの右側に薄い縦列 / マスの下）"
+                  >
+                    <span>位置: {view.lyricsPosition === 'bottom' ? 'マスの下' : 'マスの右列'}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Zoom buttons */}
+              <div className="flex items-center rounded-lg border border-stone-200 bg-white p-0.5">
+                <button
+                  onClick={() => handleZoom(-0.1)}
+                  className="p-1 text-stone-500 hover:text-stone-900 cursor-pointer"
+                  title="縮小"
+                >
+                  <ZoomOut className="h-3 w-3" />
+                </button>
+                <span className="px-1 text-[10px] font-mono font-semibold text-stone-600">
+                  {Math.round(view.zoom * 100)}%
+                </span>
+                <button
+                  onClick={() => handleZoom(0.1)}
+                  className="p-1 text-stone-500 hover:text-stone-900 cursor-pointer"
+                  title="拡大"
+                >
+                  <ZoomIn className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

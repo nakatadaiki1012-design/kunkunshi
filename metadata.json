@@ -1,6 +1,5 @@
 {
-  "name": "工工四エディタ Pro - 沖縄三線スコア作成・保存・演奏ビューア",
-  "description": "沖縄三線の工工四（クンクンシー）を縦書き・横書き編集、高音質三線音源再生、ステージ演奏高コントラスト表示、WAV/MIDI出力できる専門エディタ。",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "工工四エディタ (Kunkunshi Editor)",
+  "description": "沖縄三線の工工四を、縦書き（作文用紙のようなマス目）とタブ譜の両方で作成・再生・編集・印刷・WAV/MIDI書き出しできるエディタ",
+  "requestFramePermissions": []
 }

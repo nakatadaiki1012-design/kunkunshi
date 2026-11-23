@@ -5,9 +5,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  KotoScore,
+  KunkunshiScore,
   CursorPosition,
-  KANJI_STRINGS,
+  POSITION_NAMES,
+  KANDOKORO,
+  STRING_NAMES,
+  POSITIONS_BY_STRING,
+  getOpenStrings,
+  accidentalOf,
   LEFT_HAND_ORNS,
   RIGHT_HAND_ORNS,
   ORN_MARKS,
@@ -18,11 +23,11 @@ import {
   NOTE_DOREMI,
   getTuningLabel,
   noteName
-} from '../types/koto';
+} from '../types/kunkunshi';
 import { Plus, Play, Repeat, Trash2, Copy, Edit2, Check, X, MoreVertical } from 'lucide-react';
 
 interface ScoreSheetVerticalProps {
-  score: KotoScore;
+  score: KunkunshiScore;
   cursor: CursorPosition;
   currentPlayKey: string | null;
   selectedRange: [number, number] | null;
@@ -33,60 +38,13 @@ interface ScoreSheetVerticalProps {
   onSlotMouseUp?: () => void;
   onMeasureClick: (mIdx: number) => void;
   onLyricsChange?: (mIdx: number, bIdx: number, text: string) => void;
-  onUpdateScoreMeta?: (meta: Partial<KotoScore>) => void;
+  onUpdateScoreMeta?: (meta: Partial<KunkunshiScore>) => void;
   onInsertMeasure?: (mIdx: number) => void;
   onDuplicateMeasure?: (mIdx: number) => void;
   onDeleteMeasure?: (mIdx: number) => void;
   onAddMeasure?: () => void;
   onSetLoop?: (active: boolean, a?: number, b?: number) => void;
   autoScroll?: boolean;
-}
-
-function toHalfWidthKatakana(str: string): string {
-  if (!str) return '';
-  return str;
-}
-
-function handleLyricKeyDown(
-  e: React.KeyboardEvent<HTMLInputElement>,
-  mIdx: number,
-  bIdx: number,
-  measures: any[]
-) {
-  const key = e.key;
-  if (key === 'Enter' || key === 'ArrowDown' || key === 'ArrowRight' || (key === 'Tab' && !e.shiftKey)) {
-    e.preventDefault();
-    let nextM = mIdx;
-    let nextB = bIdx + 1;
-    if (nextB >= measures[mIdx].beats.length) {
-      nextM = mIdx + 1;
-      nextB = 0;
-    }
-    if (nextM < measures.length) {
-      const el = document.querySelector<HTMLInputElement>(`[data-lyric-input="${nextM}-${nextB}"]`);
-      if (el) {
-        el.focus();
-        el.select();
-      }
-    }
-  } else if (key === 'ArrowUp' || key === 'ArrowLeft' || (key === 'Tab' && e.shiftKey)) {
-    e.preventDefault();
-    let prevM = mIdx;
-    let prevB = bIdx - 1;
-    if (prevB < 0) {
-      prevM = mIdx - 1;
-      if (prevM >= 0) {
-        prevB = measures[prevM].beats.length - 1;
-      }
-    }
-    if (prevM >= 0) {
-      const el = document.querySelector<HTMLInputElement>(`[data-lyric-input="${prevM}-${prevB}"]`);
-      if (el) {
-        el.focus();
-        el.select();
-      }
-    }
-  }
 }
 
 export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
@@ -111,10 +69,13 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pitches = getPitches(score);
-  const perLine = score.view.perLine || 4;
-  const isArabic = score.view.numerals === 'arabic';
+  const stringNames = POSITION_NAMES;
+  const openStrings = getOpenStrings(score);
+  const perLine = score.view.perLine || 3;
+  const isArabic = false;
   const isRubyOn = score.view.ruby !== 'off';
 
+  // Inline meta editing state
   const [editingField, setEditingField] = useState<'title' | 'subtitle' | 'composer' | 'tempo' | null>(null);
   const [editVal, setEditVal] = useState('');
   const [activeMenuMeasure, setActiveMenuMeasure] = useState<number | null>(null);
@@ -138,6 +99,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
     setEditingField(null);
   };
 
+  // Group measures into columns
   const columns: { measures: number[] }[] = [];
   for (let i = 0; i < score.measures.length; i += perLine) {
     const measureIndices = [];
@@ -147,6 +109,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
     columns.push({ measures: measureIndices });
   }
 
+  // Auto-scroll active measure or active playing slot into center
   useEffect(() => {
     if (!autoScroll) return;
     const targetId = currentPlayKey ? `slot-${currentPlayKey}` : `measure-${cursor.m}`;
@@ -160,16 +123,16 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
     }
   }, [cursor.m, currentPlayKey, autoScroll]);
 
-  const renderRuby = (slNotes: number[], oshi: number = 0, ato?: boolean) => {
+  const renderRuby = (slNotes: number[], oshi: number = 0) => {
     if (score.view.ruby === 'off' || !slNotes.length) return null;
     const names = score.view.ruby === 'cde' ? NOTE_CDE : NOTE_DOREMI;
     const text = slNotes
       .map(n => {
         const base = pitches[n];
-        const sounding = base + (ato ? 0 : oshi || 0);
+        const sounding = base + accidentalOf({ oshi });
         return names[pc(sounding)];
       })
-      .join(' ');
+      .join('·');
     return <span className="text-[9px] text-stone-500 font-sans tracking-tighter leading-none mt-0.5">{text}</span>;
   };
 
@@ -197,12 +160,15 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
       ref={containerRef}
       onMouseUp={onSlotMouseUp}
       data-font={score.view.fontStyle || 'shippori'}
+      data-layout="vertical"
       style={{ zoom: score.view.zoom }}
-      className={`relative inline-flex flex-row-reverse flex-nowrap items-start gap-x-0 select-none ${fontClass} text-stone-900 transition-all min-w-max pb-4 ${
+      className={`relative inline-flex flex-row-reverse flex-nowrap items-start gap-x-2 select-none ${fontClass} text-stone-900 transition-all min-w-max pb-4 ${
         isRubyOn ? 'ruby-active' : ''
       }`}
     >
+      {/* Title & Metadata Column (Far Right in Traditional Vertical Bunkafu) */}
       <div className="flex flex-col items-end px-3 py-1 self-stretch min-w-[90px] border-l border-dashed border-stone-300 print:border-none shrink-0">
+        {/* Metas: Beats, Tempo, Clef */}
         <div className="flex flex-col items-center text-xs font-sans text-stone-600 mb-4 tabular-nums">
           <span className="font-semibold text-stone-800">{score.beatsPerMeasure}/4</span>
           {editingField === 'tempo' ? (
@@ -227,14 +193,16 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
             <button
               onClick={() => startEdit('tempo', score.tempo)}
               className="text-[11px] hover:text-indigo-600 cursor-pointer hover:underline"
-              title="速度変更"
+              title="クリックしてテンポを変更"
             >
               ♩={score.tempo}
             </button>
           )}
         </div>
 
+        {/* Title, Subtitle, Composer in Vertical Calligraphy */}
         <div className="flex flex-row-reverse items-start gap-4">
+          {/* Main Title */}
           {editingField === 'title' ? (
             <div className="flex flex-col items-center gap-1 z-30 bg-white p-2 rounded shadow-lg border border-stone-300">
               <input
@@ -245,7 +213,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                 onKeyDown={e => e.key === 'Enter' && saveEdit()}
                 className="w-32 text-center text-base font-bold border rounded p-1 font-score"
                 autoFocus
-                placeholder="曲名"
+                placeholder="曲名を入力"
               />
               <div className="flex items-center gap-1">
                 <button onClick={saveEdit} className="px-2 py-0.5 text-xs bg-indigo-600 text-white rounded font-bold cursor-pointer">
@@ -260,13 +228,14 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
             <div
               onClick={() => startEdit('title', score.title)}
               className="group relative flex flex-col items-center text-2xl sm:text-3xl font-extrabold tracking-widest text-stone-950 font-score cursor-pointer hover:text-indigo-900 transition-colors"
-              title="曲名を編集"
+              title="クリックして曲名を編集"
             >
               {toVert(score.title || '無題')}
               <Edit2 className="h-3 w-3 text-stone-400 group-hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity mt-1" />
             </div>
           )}
 
+          {/* Subtitle */}
           {editingField === 'subtitle' ? (
             <div className="flex flex-col items-center gap-1 z-30 bg-white p-2 rounded shadow-lg border border-stone-300 mt-6">
               <input
@@ -277,7 +246,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                 onKeyDown={e => e.key === 'Enter' && saveEdit()}
                 className="w-28 text-center text-xs border rounded p-1"
                 autoFocus
-                placeholder="副題"
+                placeholder="副題を入力"
               />
               <button onClick={saveEdit} className="px-2 py-0.5 text-xs bg-indigo-600 text-white rounded font-bold cursor-pointer">
                 保存
@@ -287,16 +256,17 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
             <div
               onClick={() => startEdit('subtitle', score.subtitle || '')}
               className="group flex flex-col items-center text-xs sm:text-sm font-semibold tracking-wider text-stone-600 mt-6 font-score cursor-pointer hover:text-indigo-900"
-              title="副題を編集"
+              title="クリックして副題を編集"
             >
               {score.subtitle ? (
                 toVert(score.subtitle)
               ) : (
-                <span className="opacity-0 group-hover:opacity-60 text-[10px] [writing-mode:vertical-rl]">+ 副題追加</span>
+                <span className="opacity-0 group-hover:opacity-60 text-[10px] [writing-mode:vertical-rl]">+副題</span>
               )}
             </div>
           )}
 
+          {/* Composer / Arranger */}
           {editingField === 'composer' ? (
             <div className="flex flex-col items-center gap-1 z-30 bg-white p-2 rounded shadow-lg border border-stone-300 mt-12">
               <input
@@ -307,7 +277,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                 onKeyDown={e => e.key === 'Enter' && saveEdit()}
                 className="w-28 text-center text-xs border rounded p-1 font-sans"
                 autoFocus
-                placeholder="作曲者"
+                placeholder="作曲・編曲者"
               />
               <button onClick={saveEdit} className="px-2 py-0.5 text-xs bg-indigo-600 text-white rounded font-bold cursor-pointer">
                 保存
@@ -317,27 +287,35 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
             <div
               onClick={() => startEdit('composer', score.composer || '')}
               className="group flex flex-col items-center text-xs tracking-wider text-stone-500 mt-12 font-sans cursor-pointer hover:text-indigo-900"
-              title="作曲者を編集"
+              title="クリックして作曲・編曲者を編集"
             >
               {score.composer ? (
                 toVert(score.composer)
               ) : (
-                <span className="opacity-0 group-hover:opacity-60 text-[10px] [writing-mode:vertical-rl]">+ 作曲者追加</span>
+                <span className="opacity-0 group-hover:opacity-60 text-[10px] [writing-mode:vertical-rl]">+作曲者</span>
               )}
             </div>
           )}
         </div>
 
+        {/* Tuning Chart Table (調弦表) */}
         {score.view.chart === 'on' && (
-          <div className="mt-6 flex flex-col text-[11px] font-sans border border-stone-400/80 rounded bg-stone-50/80 p-1.5 shadow-xs max-w-[140px]">
+          <div className="mt-6 flex flex-col text-[11px] font-sans border border-stone-400/80 rounded bg-stone-50/80 p-1.5 shadow-xs max-w-[150px]">
             <div className="text-[10px] font-bold text-stone-700 mb-1 border-b border-stone-200 pb-0.5">
               {getTuningLabel(score)}
             </div>
-            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 tabular-nums text-[10px] text-stone-600">
-              {KANJI_STRINGS.map((k, i) => (
-                <div key={i} className="flex justify-between">
-                  <span className="font-score font-semibold text-stone-900">{k}</span>
-                  <span>{noteName(pitches[i], false)}</span>
+            <div className="flex flex-col gap-0.5 tabular-nums text-[10px] text-stone-600">
+              {[2, 1, 0].map(str => (
+                <div key={str} className="flex items-baseline gap-1">
+                  <span className="text-stone-500 shrink-0">{STRING_NAMES[str]}</span>
+                  <span className="flex flex-wrap gap-x-1">
+                    {POSITIONS_BY_STRING[str].map(pos => (
+                      <span key={pos}>
+                        <span className="font-score font-semibold text-stone-900">{KANDOKORO[pos].name}</span>
+                        <span className="text-[9px]">{noteName(pitches[pos], false)}</span>
+                      </span>
+                    ))}
+                  </span>
                 </div>
               ))}
             </div>
@@ -345,22 +323,28 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
         )}
       </div>
 
+      {/* Measure Columns - Continuous Horizontal Flow (Never wrapped awkwardly) */}
       {columns.map((col, colIdx) => (
-        <div key={colIdx} className="flex flex-col shrink-0">
+        <div key={colIdx} className="score-column flex flex-col shrink-0">
+          {/* Column Header showing Measure Range */}
           <div className="h-5 px-1 font-sans text-[11px] text-stone-500 tabular-nums font-semibold flex items-center justify-between border-b border-stone-300">
-            <span>{col.measures[0] + 1}〜{col.measures[col.measures.length - 1] + 1}小節</span>
+            <span>{col.measures[0] + 1}〜{col.measures[col.measures.length - 1] + 1}</span>
+            <span className="text-[9px] text-stone-400">段</span>
           </div>
-          <div className="border border-stone-900 border-t-0 bg-stone-50/60 shadow-xs">
+
+          {/* Column Body containing Measures */}
+          <div className="border-[1.5px] border-stone-800 border-t-0 bg-[#fffdf7] shadow-xs">
             {col.measures.map(mIdx => {
               const measure = score.measures[mIdx];
               const isSelectedMeasure =
                 selectedRange && mIdx >= selectedRange[0] && mIdx <= selectedRange[1];
               const isCurrentCursorMeasure = cursor.m === mIdx;
+
               return (
                 <div
                   key={mIdx}
                   id={`measure-${mIdx}`}
-                  className={`relative border-t-[2.5px] border-stone-900 transition-colors ${
+                  className={`relative border-t-2 border-stone-800 transition-colors ${
                     isSelectedMeasure
                       ? 'bg-amber-100/60 ring-2 ring-indigo-500/50'
                       : isCurrentCursorMeasure
@@ -368,10 +352,11 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                       : ''
                   }`}
                 >
+                  {/* Measure Number Clickable for Playback & Actions Menu */}
                   <div className="absolute -left-0.5 top-0.5 z-20 flex items-center">
                     <button
                       onClick={() => onMeasureClick(mIdx)}
-                      title={`第 ${mIdx + 1} 小節再生`}
+                      title={`第${mIdx + 1}小節から再生 (右アイコンで小節操作)`}
                       className="font-sans text-[10px] font-bold text-stone-500 hover:text-red-700 hover:underline px-0.5 cursor-pointer"
                     >
                       {mIdx + 1}
@@ -382,19 +367,20 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                         setActiveMenuMeasure(activeMenuMeasure === mIdx ? null : mIdx);
                       }}
                       className="text-stone-300 hover:text-stone-700 p-0.5 cursor-pointer no-print opacity-60 hover:opacity-100"
-                      title="小節メニュー"
+                      title="小節メニュー（挿入・複製・削除・ループ）"
                     >
                       <MoreVertical className="h-2.5 w-2.5" />
                     </button>
                   </div>
 
+                  {/* Measure Actions Popover */}
                   {activeMenuMeasure === mIdx && (
                     <div
                       onClick={e => e.stopPropagation()}
                       className="absolute left-6 top-1 z-40 flex flex-col gap-1 rounded-lg bg-white p-1.5 shadow-xl border border-stone-300 text-xs min-w-[145px] text-stone-700 no-print"
                     >
                       <div className="flex items-center justify-between border-b pb-1 font-bold text-stone-800 text-[11px]">
-                        <span>第 {mIdx + 1} 小節</span>
+                        <span>第{mIdx + 1}小節の操作</span>
                         <button
                           onClick={() => setActiveMenuMeasure(null)}
                           className="text-stone-400 hover:text-stone-700 cursor-pointer"
@@ -420,7 +406,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                             }}
                             className="flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 rounded text-left cursor-pointer"
                           >
-                            <Repeat className="h-3 w-3 text-amber-600" /> ここから最後までループ
+                            <Repeat className="h-3 w-3 text-amber-600" /> ループ開始(A)に設定
                           </button>
                           <button
                             onClick={() => {
@@ -429,7 +415,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                             }}
                             className="flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 rounded text-left cursor-pointer"
                           >
-                            <Repeat className="h-3 w-3 text-amber-600" /> 最初からここまでループ
+                            <Repeat className="h-3 w-3 text-amber-600" /> ループ終了(B)に設定
                           </button>
                         </>
                       )}
@@ -441,7 +427,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                           }}
                           className="flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 rounded text-left cursor-pointer border-t"
                         >
-                          <Plus className="h-3 w-3 text-emerald-600" /> 前に小節挿入
+                          <Plus className="h-3 w-3 text-emerald-600" /> 前に小節を挿入
                         </button>
                       )}
                       {onDuplicateMeasure && (
@@ -452,7 +438,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                           }}
                           className="flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 rounded text-left cursor-pointer"
                         >
-                          <Copy className="h-3 w-3 text-blue-600" /> 複製
+                          <Copy className="h-3 w-3 text-blue-600" /> この小節を複製
                         </button>
                       )}
                       {onDeleteMeasure && score.measures.length > 1 && (
@@ -463,34 +449,41 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                           }}
                           className="flex items-center gap-1.5 px-2 py-1 hover:bg-red-50 text-red-600 rounded text-left cursor-pointer"
                         >
-                          <Trash2 className="h-3 w-3 text-red-600" /> 削除
+                          <Trash2 className="h-3 w-3 text-red-600" /> この小節を削除
                         </button>
                       )}
                     </div>
                   )}
 
+                  {/* Beats in Measure */}
                   <div className="flex flex-col">
                     {measure.beats.map((beat, bIdx) => {
                       const div = beat.div;
-                      const beatHeight = isRubyOn ? 76 : 60;
+                      // 作文用紙のような正方形のマス（歌詞はマスの右の細い列）
+                      const beatHeight = isRubyOn ? 72 : 60;
                       const isLyricsRight = score.view.showLyrics && score.view.lyricsPosition !== 'bottom';
                       const isLyricsBottom = score.view.showLyrics && score.view.lyricsPosition === 'bottom';
-                      const beatWidth = isLyricsRight ? 96 : 74;
+                      const beatWidth = isLyricsRight ? 84 : 62;
 
                       return (
                         <div
                           key={bIdx}
                           style={{ height: `${beatHeight}px`, width: `${beatWidth}px` }}
-                          className="relative flex flex-row border-t first:border-t-0 border-stone-900"
+                          className="relative flex flex-row border-t first:border-t-0 border-stone-500"
                         >
+                          {/* Notes Cell Area (Left) */}
                           <div className="flex-1 flex flex-col h-full min-w-0">
-                            {div === 1 ? (
+                          {/* Inner Slots */}
+                          {beat.subDiv === '8_16_16' ? (
+                            /* 表8分 + 裏16分×2（裏拍のみ2分割: 表拍は8分音符マスの縦幅をそのまま維持） */
+                            <div className="flex flex-col h-full divide-y divide-stone-300">
+                              {/* 表拍: 8分音符マス（上半分 50%） */}
                               <div
                                 id={`slot-${mIdx}-${bIdx}-0`}
                                 onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, 0, e)}
                                 onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, 0)}
                                 onClick={e => onSlotClick(mIdx, bIdx, 0, false, e.shiftKey, e.ctrlKey || e.metaKey)}
-                                className={`relative flex h-full flex-col items-center justify-center cursor-pointer transition-colors ${
+                                className={`relative flex h-1/2 flex-col items-center justify-center cursor-pointer transition-colors ${
                                   selectedSlotKeys?.has(`${mIdx}-${bIdx}-0`)
                                     ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
                                     : cursor.m === mIdx && cursor.b === bIdx && cursor.s === 0
@@ -498,11 +491,12 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                                     : ''
                                 } ${currentPlayKey === `${mIdx}-${bIdx}-0` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
                               >
-                                {renderSlotContent(beat.slots[0], isArabic, isRubyOn, renderRuby, false, false, score.view.scoreFontSize)}
+                                {renderSlotContent(beat.slots[0], isArabic, isRubyOn, renderRuby, false, false, stringNames)}
                               </div>
-                            ) : div === 2 ? (
-                              <div className="flex flex-col h-full divide-y divide-stone-300">
-                                {beat.slots.map((sl, sIdx) => {
+
+                              {/* 裏拍: 16分音符マス×2（下半分 50% を縦2分割） */}
+                              <div className="flex flex-col h-1/2 divide-y divide-stone-300">
+                                {[1, 2].map(sIdx => {
                                   const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
                                   const isMultiSel = selectedSlotKeys?.has(slotKey);
                                   return (
@@ -520,14 +514,18 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                                           : ''
                                       } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
                                     >
-                                      {renderSlotContent(sl, isArabic, isRubyOn, renderRuby, false, false, score.view.scoreFontSize)}
+                                      {renderSlotContent(beat.slots[sIdx], isArabic, isRubyOn, renderRuby, true, true, stringNames)}
                                     </div>
                                   );
                                 })}
                               </div>
-                            ) : (
-                              <div className="flex flex-col h-full divide-y divide-stone-300">
-                                {beat.slots.map((sl, sIdx) => {
+                            </div>
+                          ) : beat.subDiv === '16_16_8' ? (
+                            /* 表16分×2 + 裏8分（表拍のみ2分割） */
+                            <div className="flex flex-col h-full divide-y divide-stone-300">
+                              {/* 表拍: 16分音符マス×2（上半分 50% を縦2分割） */}
+                              <div className="flex flex-col h-1/2 divide-y divide-stone-300">
+                                {[0, 1].map(sIdx => {
                                   const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
                                   const isMultiSel = selectedSlotKeys?.has(slotKey);
                                   return (
@@ -545,40 +543,207 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                                           : ''
                                       } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
                                     >
-                                      {renderSlotContent(sl, isArabic, isRubyOn, renderRuby, true, true, score.view.scoreFontSize)}
+                                      {renderSlotContent(beat.slots[sIdx], isArabic, isRubyOn, renderRuby, true, true, stringNames)}
                                     </div>
                                   );
                                 })}
                               </div>
-                            )}
+
+                              {/* 裏拍: 8分音符マス（下半分 50%） */}
+                              <div
+                                id={`slot-${mIdx}-${bIdx}-2`}
+                                onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, 2, e)}
+                                onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, 2)}
+                                onClick={e => onSlotClick(mIdx, bIdx, 2, false, e.shiftKey, e.ctrlKey || e.metaKey)}
+                                className={`relative flex h-1/2 flex-col items-center justify-center cursor-pointer transition-colors ${
+                                  selectedSlotKeys?.has(`${mIdx}-${bIdx}-2`)
+                                    ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
+                                    : cursor.m === mIdx && cursor.b === bIdx && cursor.s === 2
+                                    ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
+                                    : ''
+                                } ${currentPlayKey === `${mIdx}-${bIdx}-2` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
+                              >
+                                {renderSlotContent(beat.slots[2], isArabic, isRubyOn, renderRuby, false, false, stringNames)}
+                              </div>
+                            </div>
+                          ) : div === 1 ? (
+                            /* 4th note (♩): 1拍全体を1マスとして表示（上下分割線なし） */
+                            <div
+                              id={`slot-${mIdx}-${bIdx}-0`}
+                              onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, 0, e)}
+                              onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, 0)}
+                              onClick={e => onSlotClick(mIdx, bIdx, 0, false, e.shiftKey, e.ctrlKey || e.metaKey)}
+                              className={`relative flex h-full flex-col items-center justify-center cursor-pointer transition-colors ${
+                                selectedSlotKeys?.has(`${mIdx}-${bIdx}-0`)
+                                  ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
+                                  : cursor.m === mIdx && cursor.b === bIdx && cursor.s === 0
+                                  ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
+                                  : ''
+                              } ${currentPlayKey === `${mIdx}-${bIdx}-0` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
+                            >
+                              {renderSlotContent(beat.slots[0], isArabic, isRubyOn, renderRuby, undefined, undefined, stringNames)}
+                            </div>
+                          ) : div === 2 ? (
+                            /* 8th notes (♪♪): Two equal halves with subtle dividing line */
+                            <div className="flex flex-col h-full divide-y divide-stone-300">
+                              {beat.slots.map((sl, sIdx) => {
+                                const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
+                                const isMultiSel = selectedSlotKeys?.has(slotKey);
+                                return (
+                                  <div
+                                    key={sIdx}
+                                    id={`slot-${mIdx}-${bIdx}-${sIdx}`}
+                                    onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, sIdx, e)}
+                                    onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, sIdx)}
+                                    onClick={e => onSlotClick(mIdx, bIdx, sIdx, false, e.shiftKey, e.ctrlKey || e.metaKey)}
+                                    className={`relative flex flex-1 flex-col items-center justify-center cursor-pointer transition-colors ${
+                                      isMultiSel
+                                        ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
+                                        : cursor.m === mIdx && cursor.b === bIdx && cursor.s === sIdx
+                                        ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
+                                        : ''
+                                    } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
+                                  >
+                                    {renderSlotContent(sl, isArabic, isRubyOn, renderRuby, undefined, undefined, stringNames)}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : div === 3 ? (
+                            /* Triplets (3連符) */
+                            <div className="relative flex flex-col h-full divide-y divide-stone-300">
+                              <span className="absolute left-1 bottom-0.5 text-[9px] italic font-sans text-stone-500 pointer-events-none">
+                                3
+                              </span>
+                              {beat.slots.map((sl, sIdx) => {
+                                const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
+                                const isMultiSel = selectedSlotKeys?.has(slotKey);
+                                return (
+                                  <div
+                                    key={sIdx}
+                                    id={`slot-${mIdx}-${bIdx}-${sIdx}`}
+                                    onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, sIdx, e)}
+                                    onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, sIdx)}
+                                    onClick={e => onSlotClick(mIdx, bIdx, sIdx, false, e.shiftKey, e.ctrlKey || e.metaKey)}
+                                    className={`relative flex flex-1 flex-col items-center justify-center cursor-pointer transition-colors ${
+                                      isMultiSel
+                                        ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
+                                        : cursor.m === mIdx && cursor.b === bIdx && cursor.s === sIdx
+                                        ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
+                                        : ''
+                                    } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
+                                  >
+                                    {renderSlotContent(sl, isArabic, isRubyOn, renderRuby, true, undefined, stringNames)}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : score.view.sixteenthLayout === 'grid' ? (
+                            /* 16th notes (♬) - 2x2 Grid Layout */
+                            <div className="flex flex-col h-full divide-y divide-stone-300">
+                              <div className="flex flex-1 divide-x divide-stone-300">
+                                {[0, 1].map(sIdx => {
+                                  const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
+                                  const isMultiSel = selectedSlotKeys?.has(slotKey);
+                                  return (
+                                    <div
+                                      key={sIdx}
+                                      id={`slot-${mIdx}-${bIdx}-${sIdx}`}
+                                      onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, sIdx, e)}
+                                      onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, sIdx)}
+                                      onClick={e => onSlotClick(mIdx, bIdx, sIdx, false, e.shiftKey, e.ctrlKey || e.metaKey)}
+                                      className={`relative flex flex-1 flex-col items-center justify-center cursor-pointer transition-colors ${
+                                        isMultiSel
+                                          ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
+                                          : cursor.m === mIdx && cursor.b === bIdx && cursor.s === sIdx
+                                          ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
+                                          : ''
+                                      } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
+                                    >
+                                      {renderSlotContent(beat.slots[sIdx], isArabic, isRubyOn, renderRuby, true, undefined, stringNames)}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="flex flex-1 divide-x divide-stone-400">
+                                {[2, 3].map(sIdx => {
+                                  const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
+                                  const isMultiSel = selectedSlotKeys?.has(slotKey);
+                                  return (
+                                    <div
+                                      key={sIdx}
+                                      id={`slot-${mIdx}-${bIdx}-${sIdx}`}
+                                      onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, sIdx, e)}
+                                      onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, sIdx)}
+                                      onClick={e => onSlotClick(mIdx, bIdx, sIdx, false, e.shiftKey, e.ctrlKey || e.metaKey)}
+                                      className={`relative flex flex-1 flex-col items-center justify-center cursor-pointer transition-colors ${
+                                        isMultiSel
+                                          ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
+                                          : cursor.m === mIdx && cursor.b === bIdx && cursor.s === sIdx
+                                          ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
+                                          : ''
+                                      } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
+                                    >
+                                      {renderSlotContent(beat.slots[sIdx], isArabic, isRubyOn, renderRuby, true, undefined, stringNames)}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            /* 16th notes (♬) - Vertical 4-Stack Layout (縦4段：8分音符より縦に半分小さく表示) */
+                            <div className="flex flex-col h-full divide-y divide-stone-300">
+                              {[0, 1, 2, 3].map(sIdx => {
+                                const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
+                                const isMultiSel = selectedSlotKeys?.has(slotKey);
+                                return (
+                                  <div
+                                    key={sIdx}
+                                    id={`slot-${mIdx}-${bIdx}-${sIdx}`}
+                                    onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, sIdx, e)}
+                                    onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, sIdx)}
+                                    onClick={e => onSlotClick(mIdx, bIdx, sIdx, false, e.shiftKey, e.ctrlKey || e.metaKey)}
+                                    className={`relative flex flex-1 flex-col items-center justify-center cursor-pointer transition-colors ${
+                                      isMultiSel
+                                        ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
+                                        : cursor.m === mIdx && cursor.b === bIdx && cursor.s === sIdx
+                                        ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
+                                        : ''
+                                    } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
+                                  >
+                                    {renderSlotContent(beat.slots[sIdx], isArabic, isRubyOn, renderRuby, true, true, stringNames)}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
                           </div>
 
+                          {/* Optional Lyrics row at bottom */}
                           {isLyricsBottom && (
                             <input
                               type="text"
-                              data-lyric-input={`${mIdx}-${bIdx}`}
                               value={beat.lyrics || ''}
                               onChange={e => onLyricsChange && onLyricsChange(mIdx, bIdx, e.target.value)}
-                              onKeyDown={e => handleLyricKeyDown(e, mIdx, bIdx, score.measures)}
                               placeholder="歌詞"
-                              className="w-full text-center border-t border-dotted border-stone-400 bg-transparent px-0.5 focus:bg-white focus:outline-none text-[10px]"
+                              className="w-full text-center text-[10px] font-sans border-t border-dotted border-stone-400 bg-transparent px-0.5 focus:bg-white focus:outline-none"
                             />
                           )}
 
+                          {/* Thin Right Lyrics Column (マスの右側に薄い列を挿入して縦書き表示・入力) */}
                           {isLyricsRight && (
                             <div
-                              className="w-5.5 shrink-0 border-l border-stone-300 bg-stone-50/50 flex items-center justify-center relative print:bg-transparent"
-                              title="歌詞"
+                              className="w-5.5 shrink-0 border-l border-dotted border-stone-400 bg-transparent flex items-center justify-center relative"
+                              title="歌詞（縦書き）"
                             >
                               <input
                                 type="text"
-                                data-lyric-input={`${mIdx}-${bIdx}`}
                                 value={beat.lyrics || ''}
                                 onChange={e => onLyricsChange && onLyricsChange(mIdx, bIdx, e.target.value)}
-                                onKeyDown={e => handleLyricKeyDown(e, mIdx, bIdx, score.measures)}
-                                placeholder="歌詞"
+                                placeholder="詞"
                                 style={{ writingMode: 'vertical-rl', textOrientation: 'upright' }}
-                                className="w-full h-full text-center text-stone-800 bg-transparent focus:bg-white focus:outline-none select-none tracking-tighter placeholder:text-stone-300/80 text-[10px]"
+                                className="w-full h-full text-center text-[12px] font-score text-stone-800 bg-transparent focus:bg-white focus:outline-none select-none tracking-tighter placeholder:text-stone-300/80 print:placeholder-transparent"
                               />
                             </div>
                           )}
@@ -587,6 +752,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                     })}
                   </div>
 
+                  {/* 終止線 (Final Double Barline in Japanese Vertical Score) */}
                   {mIdx === score.measures.length - 1 && (
                     <div className="w-full flex flex-col gap-[2px] pt-1 pb-1.5 px-0.5 bg-stone-900/5 border-t border-stone-800" title="終止線">
                       <div className="w-full h-[1.5px] bg-stone-900"></div>
@@ -600,6 +766,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
         </div>
       ))}
 
+      {/* Quick Add Measure Column */}
       {onAddMeasure && (
         <button
           onClick={onAddMeasure}
@@ -618,111 +785,233 @@ function renderSlotContent(
   sl: any,
   isArabic: boolean,
   isRubyOn: boolean,
-  renderRuby: (notes: number[], oshi?: number, ato?: boolean) => React.ReactNode,
+  renderRuby: (notes: number[], oshi?: number) => React.ReactNode,
   small: boolean = false,
   extraCompact: boolean = false,
-  scoreFontSize?: string
+  stringNames: readonly string[] = POSITION_NAMES
 ) {
   if (!sl) return null;
+
   if (sl.rest) {
     return (
-      <span className={`${extraCompact ? 'text-xs' : small ? 'text-sm' : 'text-lg'} leading-none font-sans font-light text-stone-900`}>
-        休
+      <span
+        className={`${
+          extraCompact ? 'text-xs' : small ? 'text-sm' : 'text-lg'
+        } leading-none font-sans font-light text-stone-900`}
+      >
+        ○
       </span>
     );
   }
+
   if (sl.tie) {
     return <span className={`w-0.5 ${extraCompact ? 'h-1/2' : 'h-3/4'} bg-stone-900 block`}></span>;
   }
+
+  // 2拍繰り返し記号（ひらがなの「く」のように2拍を繰り返す）
   if (sl.repeat2) {
     return (
-      <div className="flex flex-col items-center justify-center w-full h-full" title="2拍前くり返し">
-        <span className="font-score font-black text-xl sm:text-2xl text-stone-900 leading-none select-none tracking-tighter">
-          𝄀𝄀
+      <div className="flex flex-col items-center justify-center w-full h-full" title="2拍繰り返し（重ね記号）">
+        <span
+          className={`font-score font-black ${
+            extraCompact ? 'text-base' : small ? 'text-xl' : 'text-2xl sm:text-3xl'
+          } text-stone-900 leading-none select-none tracking-tighter`}
+        >
+          𝄥
         </span>
       </div>
     );
   }
 
+  // 左手の記号（♯・♭、打・掛・押・摺・ユ）
   let lh = '';
-  if (sl.oshi === 1) lh += '強';
-  else if (sl.oshi === 2) lh += '巾';
+  if (sl.oshi === 1) lh += '♯';
+  else if (sl.oshi === 2) lh += '♭';
   LEFT_HAND_ORNS.forEach(k => {
     if (sl[k]) lh += ORN_MARKS[k];
   });
 
+  // 右手の記号（ス・〰・止）
   let rh = '';
   RIGHT_HAND_ORNS.forEach(k => {
     if (sl[k]) rh += ORN_MARKS[k];
   });
 
+  // Finger number (e.g. 3 for middle finger 中指)
   const fingerText = sl.finger ? String(sl.finger) : '';
   const noteCount = sl.notes?.length || 0;
   const isChord = noteCount > 1;
 
-  let chordTextSize = extraCompact ? 'text-[11px] leading-none font-bold' : small ? 'text-xs leading-none font-bold' : 'text-xl leading-none font-bold';
-  let lhTextSize = isChord ? 'text-xs sm:text-sm' : 'text-base sm:text-lg';
-
+  // 奏法だけが入った空きマス
   if (noteCount === 0) {
     if (!lh && !rh && !fingerText) return null;
+
+    const aloneTextSize = extraCompact
+      ? 'text-xs'
+      : small
+      ? 'text-sm'
+      : 'text-lg sm:text-xl';
+
     return (
       <div className="relative flex items-center justify-center w-full h-full px-0.5 overflow-hidden select-none">
-        {rh && (
-          <span className="absolute right-0.5 top-0.5 text-[9px] font-semibold text-stone-800 leading-none font-score select-none">
-            {toHalfWidthKatakana(rh)}
-          </span>
-        )}
+        <div className="flex items-center justify-center gap-0.5 leading-none">
+          {lh && (
+            <span
+              className={`${aloneTextSize} font-bold text-red-700 font-score leading-none tracking-tight`}
+              title="押手・左手技法"
+            >
+              {lh}
+            </span>
+          )}
+          {rh && (
+            <span
+              className={`${aloneTextSize} font-bold text-stone-900 font-score leading-none tracking-tight`}
+              title="右手技法"
+            >
+              {rh}
+            </span>
+          )}
+        </div>
         {fingerText && (
-          <span className="absolute right-0.5 top-0.5 font-sans font-extrabold text-[9px] w-3 h-3 text-amber-950 bg-amber-200/90 rounded-full flex items-center justify-center leading-none shadow-2xs">
+          <span
+            className={`absolute right-0.5 top-0.5 font-sans font-extrabold ${
+              extraCompact ? 'text-[8px] w-2.5 h-2.5' : 'text-[9px] w-3 h-3'
+            } text-amber-950 bg-amber-200/90 rounded-full flex items-center justify-center leading-none shadow-2xs`}
+          >
             {fingerText}
           </span>
         )}
-        <div className="w-full max-w-full flex items-center justify-center shrink-0">
-          <div className="flex items-center justify-center gap-0.5 select-none font-score leading-none">
-            {lh && (
-              <span className={`${lhTextSize} shrink-0 font-semibold text-red-700/90 font-score tracking-tighter mr-0.5 select-none`}>
-                {toHalfWidthKatakana(lh)}
-              </span>
-            )}
-          </div>
-        </div>
       </div>
     );
   }
 
+  // Dynamic chord text sizing & auto-shrink scaling to prevent overflowing horizontal cell bounds
+  let chordTextSize = '';
+  let lhTextSize = '';
+  let scaleTransform = '';
+  let gapClass = 'gap-0.5';
+
+  if (extraCompact) {
+    // 16th vertical 4-division
+    lhTextSize = isChord ? 'text-[8.5px]' : 'text-[10px]';
+    if (noteCount >= 4) {
+      chordTextSize = 'text-[7px] leading-none';
+      scaleTransform = 'scale-[0.72] origin-center';
+      gapClass = 'gap-0';
+    } else if (noteCount === 3) {
+      chordTextSize = 'text-[8px] leading-none';
+      scaleTransform = 'scale-[0.85] origin-center';
+      gapClass = 'gap-[1px]';
+    } else if (noteCount === 2) {
+      chordTextSize = 'text-[9px] leading-none font-extrabold';
+      scaleTransform = 'scale-[0.95] origin-center';
+      gapClass = 'gap-[1px]';
+    } else {
+      chordTextSize = 'text-[11px] leading-none font-bold';
+    }
+  } else if (small) {
+    // Triplets or 16th grid
+    lhTextSize = isChord ? 'text-[9.5px]' : 'text-xs sm:text-[13px]';
+    if (noteCount >= 4) {
+      chordTextSize = 'text-[8px] leading-none';
+      scaleTransform = 'scale-[0.78] origin-center';
+      gapClass = 'gap-0';
+    } else if (noteCount === 3) {
+      chordTextSize = 'text-[9px] leading-none';
+      scaleTransform = 'scale-[0.88] origin-center';
+      gapClass = 'gap-[1px]';
+    } else if (noteCount === 2) {
+      chordTextSize = 'text-[10px] leading-none font-extrabold';
+      gapClass = 'gap-[1px]';
+    } else {
+      chordTextSize = 'text-xs leading-none font-bold';
+    }
+  } else {
+    // Standard quarter or 8th note slots
+    lhTextSize = isChord ? 'text-xs sm:text-sm' : 'text-base sm:text-lg';
+    if (noteCount >= 4) {
+      chordTextSize = 'text-[10px] sm:text-xs leading-none font-extrabold';
+      scaleTransform = 'scale-[0.82] origin-center';
+      gapClass = 'gap-[1px]';
+    } else if (noteCount === 3) {
+      chordTextSize = 'text-xs sm:text-sm leading-none font-extrabold';
+      scaleTransform = 'scale-[0.92] origin-center';
+      gapClass = 'gap-0.5';
+    } else if (noteCount === 2) {
+      chordTextSize = 'text-sm sm:text-base leading-none font-extrabold';
+      gapClass = 'gap-0.5';
+    } else {
+      chordTextSize = 'text-[1.6rem] leading-none font-bold';
+    }
+  }
+
   return (
     <div className="relative flex items-center justify-center w-full h-full px-0.5 overflow-hidden">
+      {/* Right-hand ornament (top right) */}
       {rh && (
-        <span className="absolute right-0.5 top-0.5 text-[9px] font-semibold text-stone-900 leading-none font-score select-none">
-          {toHalfWidthKatakana(rh)}
+        <span
+          className={`absolute right-0.5 top-0.5 ${
+            extraCompact ? 'text-[8px]' : 'text-[11px]'
+          } font-extrabold text-stone-900 leading-none font-score select-none`}
+        >
+          {rh}
         </span>
       )}
+
+      {/* Finger number (中指「３」など: 右上または数字の上に表示) */}
       {fingerText && (
-        <span className="absolute right-0.5 top-0.5 font-sans font-extrabold text-[9px] w-3 h-3 text-amber-950 bg-amber-200/90 rounded-full flex items-center justify-center leading-none shadow-2xs select-none">
-          {fingerText}
+        <span
+          className={`absolute right-0.5 top-0.5 font-sans font-extrabold ${
+            extraCompact ? 'text-[8px] w-2.5 h-2.5' : 'text-[9px] w-3 h-3'
+          } text-amber-950 bg-amber-200/90 rounded-full flex items-center justify-center leading-none shadow-2xs select-none`}
+          title={`押さえる指: ${fingerText === '3' ? '小指' : fingerText === '2' ? '中指' : '人差指'}`}
+        >
+          {['', '人', '中', '小'][Number(fingerText)] || fingerText}
         </span>
       )}
-      <div className="w-full max-w-full flex items-center justify-center shrink-0">
-        <div className="flex items-center justify-center gap-0.5 select-none font-score leading-none">
+
+      {/* Main note kanji/number with technique katakana placed adjacent (ｦ七のように漢数字に準ずる大きさで隣に表示) */}
+      <div
+        className={`w-full max-w-full flex items-center justify-center shrink-0 ${scaleTransform}`}
+      >
+        <div
+          className={`flex items-center justify-center ${gapClass} select-none font-score leading-none`}
+        >
+          {/* 左手奏法カタカナ: 漢数字のすぐ左隣に漢数字に近い大きさで配置 */}
           {lh && (
-            <span className={`${lhTextSize} shrink-0 font-semibold text-red-700/90 font-score tracking-tighter mr-0.5 select-none`}>
-              {toHalfWidthKatakana(lh)}
+            <span
+              className={`${lhTextSize} shrink-0 font-bold text-red-700 font-score tracking-tighter mr-0.5 select-none`}
+              title="押手・左手技法"
+            >
+              {lh}
             </span>
           )}
+
           {sl.notes.map((n: number, idx: number) => {
-            const char = isArabic ? String(n + 1) : KANJI_STRINGS[n];
+            const char = stringNames[n] ?? String(n + 1);
+            // 「下老」のような2文字の勘所は、縦に小さく重ねる
+            if (char.length > 1) {
+              return (
+                <span key={idx} className={`${chordTextSize} shrink-0 flex flex-col items-center leading-[0.95] scale-y-[0.9]`}>
+                  {Array.from(char).map((c, ci) => (
+                    <span key={ci} className="text-[0.62em]">
+                      {c}
+                    </span>
+                  ))}
+                </span>
+              );
+            }
             return (
-              <span
-                key={idx}
-                className={`${chordTextSize} shrink-0 ${isChord ? 'border-b border-stone-400/50 pb-0.5' : ''} ${isArabic ? 'font-sans' : ''}`}
-              >
+              <span key={idx} className={`${chordTextSize} shrink-0`}>
                 {char}
               </span>
             );
           })}
         </div>
       </div>
-      {isRubyOn && !extraCompact && renderRuby(sl.notes, sl.oshi, sl.ato)}
+
+      {/* Ruby note name */}
+      {isRubyOn && !extraCompact && renderRuby(sl.notes, sl.oshi)}
     </div>
   );
 }

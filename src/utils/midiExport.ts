@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { KotoScore, getPitches } from '../types/koto';
+import { KunkunshiScore, getPitches, accidentalOf } from '../types/kunkunshi';
+import { buildTimeline } from '../audio/timeline';
 
 function writeVarLen(val: number): number[] {
   const bytes = [];
@@ -21,27 +22,31 @@ function writeVarLen(val: number): number[] {
   return bytes;
 }
 
-export function exportScoreToMidi(score: KotoScore): Blob {
+export function exportScoreToMidi(score: KunkunshiScore): Blob {
   const ticksPerQuarter = 480;
-  const bpm = score.tempo;
-  const microsecondsPerQuarter = Math.round(60000000 / bpm);
+  const microsecondsPerQuarter = Math.round(60000000 / score.tempo);
   const pitches = getPitches(score);
+  const { items } = buildTimeline(score);
 
   interface MidiEvent {
     tick: number;
+    order: number; // 同じ時刻の並び順：メタ情報 → 音を止める → 音を出す
     data: number[];
   }
 
   const events: MidiEvent[] = [];
 
-  const titleBytes = Array.from(new TextEncoder().encode(score.title || 'Koto Song'));
-  events.push({
-    tick: 0,
-    data: [0xff, 0x03, titleBytes.length, ...titleBytes]
-  });
+  // Track Name meta event（長さは可変長で書く。日本語の曲名は127バイトを超えることがある）
+  const titleBytes = Array.from(new TextEncoder().encode(score.title || 'Kunkunshi')).slice(0, 200);
+  events.push({ tick: 0, order: 0, data: [0xff, 0x03, ...writeVarLen(titleBytes.length), ...titleBytes] });
 
+  // Time signature (n/4)
+  events.push({ tick: 0, order: 0, data: [0xff, 0x58, 0x04, score.beatsPerMeasure, 0x02, 0x18, 0x08] });
+
+  // Set Tempo meta event
   events.push({
     tick: 0,
+    order: 0,
     data: [
       0xff, 0x51, 0x03,
       (microsecondsPerQuarter >> 16) & 0xff,
@@ -50,89 +55,54 @@ export function exportScoreToMidi(score: KotoScore): Blob {
     ]
   });
 
-  events.push({
-    tick: 0,
-    data: [0xc0, 107] // GM Koto #108 (0-indexed = 107)
-  });
+  // 音色（General MIDI #107 = Shamisen。三線にいちばん近い音色）
+  events.push({ tick: 0, order: 0, data: [0xc0, 106] }); // 0始まりで 106 が Shamisen
 
-  const beatsPerMeasure = score.beatsPerMeasure;
-  score.measures.forEach((m, mIdx) => {
-    m.beats.forEach((b, bIdx) => {
-      const beatTicks = (mIdx * beatsPerMeasure + bIdx) * ticksPerQuarter;
-      b.slots.forEach((sl, sIdx) => {
-        if (sl.rest || !sl.notes.length) return;
-        let slotTickOffset = sIdx * Math.round(ticksPerQuarter / b.div);
-        let currentSlotTicks = Math.round(ticksPerQuarter / b.div);
+  items.forEach(item => {
+    const sl = item.slot;
+    if (!item.sound || sl.rest || !sl.notes.length) return;
 
-        if (b.subDiv === '8_16_16') {
-          slotTickOffset = sIdx === 0 ? 0 : sIdx === 1 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.75);
-          currentSlotTicks = sIdx === 0 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.25);
-        } else if (b.subDiv === '16_16_8') {
-          slotTickOffset = sIdx === 0 ? 0 : sIdx === 1 ? Math.round(ticksPerQuarter * 0.25) : Math.round(ticksPerQuarter * 0.5);
-          currentSlotTicks = sIdx === 2 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.25);
-        }
+    const start = Math.round(item.beat * ticksPerQuarter);
+    // 次の音（または休符）まで音を延ばす。延ばし記号や空きマスも含む。長すぎる場合は8拍で止める
+    const length = Math.max(30, Math.round(Math.min(item.durBeats, 8) * ticksPerQuarter) - 8);
 
-        const noteStartTick = beatTicks + slotTickOffset;
-        let noteDurationTicks = Math.max(20, Math.round(currentSlotTicks * 0.9));
-
-        for (let nextS = sIdx + 1; nextS < b.slots.length; nextS++) {
-          const nextSlot = b.slots[nextS];
-          if (nextSlot.tie || (!nextSlot.rest && (!nextSlot.notes || nextSlot.notes.length === 0))) {
-            let nextSlotTicks = Math.round(ticksPerQuarter / b.div);
-            if (b.subDiv === '8_16_16') {
-              nextSlotTicks = nextS === 0 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.25);
-            } else if (b.subDiv === '16_16_8') {
-              nextSlotTicks = nextS === 2 ? Math.round(ticksPerQuarter * 0.5) : Math.round(ticksPerQuarter * 0.25);
-            }
-            noteDurationTicks += nextSlotTicks;
-          } else {
-            break;
-          }
-        }
-
-        sl.notes.forEach(strIdx => {
-          if (strIdx < 0 || strIdx >= (score.stringCount || 13)) return;
-          const basePitch = pitches[strIdx];
-          const actualPitch = Math.min(127, Math.max(0, basePitch + (sl.oshi || 0)));
-
-          events.push({
-            tick: noteStartTick,
-            data: [0x90, actualPitch, 96]
-          });
-          events.push({
-            tick: noteStartTick + noteDurationTicks,
-            data: [0x80, actualPitch, 0]
-          });
-        });
-      });
+    sl.notes.forEach(pos => {
+      if (pos < 0 || pos >= pitches.length) return;
+      const pitch = Math.min(127, Math.max(0, Math.round(pitches[pos] + accidentalOf(sl))));
+      events.push({ tick: start, order: 2, data: [0x90, pitch, 96] });
+      events.push({ tick: start + length, order: 1, data: [0x80, pitch, 0] });
     });
   });
 
-  events.sort((a, b) => a.tick - b.tick);
+  events.sort((a, b) => a.tick - b.tick || a.order - b.order);
 
+  // Build Track chunk data with delta times
   const trackBytes: number[] = [];
   let lastTick = 0;
+
   events.forEach(evt => {
-    const delta = evt.tick - lastTick;
-    trackBytes.push(...writeVarLen(delta));
+    trackBytes.push(...writeVarLen(evt.tick - lastTick));
     trackBytes.push(...evt.data);
     lastTick = evt.tick;
   });
 
+  // End of Track meta event
   trackBytes.push(...writeVarLen(0));
   trackBytes.push(0xff, 0x2f, 0x00);
 
+  // MThd header: type 0, 1 track, ticksPerQuarter
   const headerBytes = [
-    0x4d, 0x54, 0x68, 0x64,
-    0x00, 0x00, 0x00, 0x06,
-    0x00, 0x00,
-    0x00, 0x01,
+    0x4d, 0x54, 0x68, 0x64, // 'MThd'
+    0x00, 0x00, 0x00, 0x06, // length = 6
+    0x00, 0x00,             // format 0
+    0x00, 0x01,             // 1 track
     (ticksPerQuarter >> 8) & 0xff, ticksPerQuarter & 0xff
   ];
 
+  // MTrk header
   const trkLen = trackBytes.length;
   const trackHeader = [
-    0x4d, 0x54, 0x72, 0x6b,
+    0x4d, 0x54, 0x72, 0x6b, // 'MTrk'
     (trkLen >> 24) & 0xff,
     (trkLen >> 16) & 0xff,
     (trkLen >> 8) & 0xff,

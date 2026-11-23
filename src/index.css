@@ -7,6 +7,7 @@
   }
 }
 
+/* Dynamic theme font mapping based on data-font attribute or font class */
 [data-font="shippori"], .font-shippori {
   --f-score: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
   font-family: var(--f-score) !important;
@@ -44,37 +45,9 @@
   grid-template-columns: repeat(13, minmax(0, 1fr));
 }
 
-@keyframes koto-string-vibrate {
-  0% { transform: translateY(0) scaleY(1); }
-  15% { transform: translateY(-3px) scaleY(1.5); }
-  30% { transform: translateY(3px) scaleY(1.35); }
-  45% { transform: translateY(-2px) scaleY(1.2); }
-  60% { transform: translateY(1.5px) scaleY(1.1); }
-  75% { transform: translateY(-0.8px) scaleY(1.05); }
-  100% { transform: translateY(0) scaleY(1); }
-}
-
-.animate-koto-vibrate {
-  animation: koto-string-vibrate 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97);
-}
-
-.koto-wood-grain {
-  background-image: 
-    radial-gradient(ellipse at 50% 50%, rgba(255, 225, 180, 0.12) 0%, transparent 80%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(60, 30, 10, 0.18) 0px,
-      rgba(60, 30, 10, 0.18) 1px,
-      transparent 1px,
-      transparent 8px,
-      rgba(100, 50, 15, 0.12) 12px,
-      transparent 16px
-    );
-}
-
 @page {
-  size: auto;
-  margin: 0mm;
+  size: A4 portrait;
+  margin: 10mm;
 }
 
 @media print {
@@ -89,6 +62,7 @@
     print-color-adjust: exact !important;
   }
 
+  /* Force all app outer containers to pure white without gray background or shadows */
   #root,
   .min-h-screen,
   div[class*="bg-[#edece8]"],
@@ -112,14 +86,28 @@
     background: #ffffff !important;
     max-height: none !important;
     overflow: visible !important;
-    padding: 12mm 15mm !important;
-    margin: 0 auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
     width: 100% !important;
-    display: flex !important;
-    justify-content: center !important;
+    display: block !important;
   }
 
-  .score-column {
+  /* 譜面：画面では横一列に並べているが、印刷では用紙の幅で折り返して複数ページにする */
+  main [data-font] {
+    zoom: 1 !important;
+  }
+  main [data-layout="vertical"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    row-gap: 6mm;
+  }
+
+  /* Prevent measure blocks and columns from breaking awkwardly */
+  .score-column,
+  .score-row {
     page-break-inside: avoid;
     break-inside: avoid;
   }
