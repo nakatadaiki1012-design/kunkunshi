@@ -1,5 +1,61 @@
 @import "tailwindcss";
 
+/*
+ * 沖縄らしい配色
+ *  indigo → 海と琉球藍（ボタン・選択）
+ *  amber  → 紅型の黄・太陽（目立たせたい所）
+ *  red    → 赤瓦・ハイビスカス（奏法記号）
+ *  stone  → 砂浜とサンゴの白（紙・枠・文字）
+ */
+@theme {
+  --color-indigo-50: #e9f7f9;
+  --color-indigo-100: #ccedf2;
+  --color-indigo-200: #a0dde7;
+  --color-indigo-300: #66c6d6;
+  --color-indigo-400: #2aa9c0;
+  --color-indigo-500: #0f8ea8;
+  --color-indigo-600: #0b7491;
+  --color-indigo-700: #0d5d78;
+  --color-indigo-800: #114b61;
+  --color-indigo-900: #123d50;
+  --color-indigo-950: #0a2633;
+
+  --color-amber-50: #fff8e6;
+  --color-amber-100: #ffefc2;
+  --color-amber-200: #ffe08f;
+  --color-amber-300: #ffcd52;
+  --color-amber-400: #fbb817;
+  --color-amber-500: #f0a000;
+  --color-amber-600: #d67f00;
+  --color-amber-700: #b05f05;
+  --color-amber-800: #8c4a0b;
+  --color-amber-900: #6f3a0e;
+  --color-amber-950: #3f1f07;
+
+  --color-red-50: #fdefea;
+  --color-red-400: #e46a4e;
+  --color-red-600: #c8452b;
+  --color-red-700: #ad3720;
+  --color-red-800: #872b19;
+
+  --color-stone-50: #fffcf5;
+  --color-stone-100: #f7f0e2;
+  --color-stone-200: #ece2cd;
+  --color-stone-300: #dccdb0;
+  --color-stone-400: #b9a888;
+  --color-stone-500: #8f7f64;
+  --color-stone-600: #6d604b;
+  --color-stone-700: #554a3a;
+  --color-stone-800: #3d3529;
+  --color-stone-900: #2a241c;
+  --color-stone-950: #1b1712;
+
+  --color-okinawa-sand: #f3e9d4;
+  --color-okinawa-sea: #0b7491;
+  --color-okinawa-tile: #c8452b;
+  --color-okinawa-sun: #fbb817;
+}
+
 @layer base {
   :root {
     --f-score: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", serif;
@@ -66,6 +122,7 @@
   #root,
   .min-h-screen,
   div[class*="bg-[#edece8]"],
+  .okinawa-bg,
   div[class*="bg-stone"] {
     background-color: #ffffff !important;
     background: #ffffff !important;
@@ -73,6 +130,7 @@
   }
 
   .no-print,
+  .minsa-band,
   header,
   nav,
   aside {
@@ -111,4 +169,50 @@
     page-break-inside: avoid;
     break-inside: avoid;
   }
+}
+
+/* ---------- 沖縄の柄 ---------- */
+
+/* 砂浜の色に、さざ波の模様をうっすら */
+.okinawa-bg {
+  background-color: #f3e9d4;
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(42, 169, 192, 0.10), transparent 45%),
+    radial-gradient(circle at 100% 100%, rgba(251, 184, 23, 0.10), transparent 40%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='24' viewBox='0 0 80 24'%3E%3Cpath d='M0 12 Q10 4 20 12 T40 12 T60 12 T80 12' fill='none' stroke='%230b7491' stroke-opacity='0.07' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+/* ミンサー織の「五つと四つ」の絣（いつの世までも）。藍の地に白い四角、上下に黄と赤の線 */
+.minsa-band {
+  height: 14px;
+  background-color: #123d50;
+  background-image:
+    linear-gradient(#fbb817, #fbb817),
+    linear-gradient(#c8452b, #c8452b),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='8' viewBox='0 0 72 8'%3E%3Cg fill='%23fffcf5'%3E%3Crect x='3' y='2' width='4' height='4'/%3E%3Crect x='9' y='2' width='4' height='4'/%3E%3Crect x='15' y='2' width='4' height='4'/%3E%3Crect x='21' y='2' width='4' height='4'/%3E%3Crect x='27' y='2' width='4' height='4'/%3E%3Crect x='42' y='2' width='4' height='4'/%3E%3Crect x='48' y='2' width='4' height='4'/%3E%3Crect x='54' y='2' width='4' height='4'/%3E%3Crect x='60' y='2' width='4' height='4'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 100% 2px, 100% 2px, 72px 8px;
+  background-position: top left, bottom left, left center;
+  background-repeat: no-repeat, no-repeat, repeat-x;
+}
+
+/* 紅型のような、黄・赤・海の色の細い帯 */
+.bingata-stripe {
+  background: linear-gradient(90deg, #c8452b 0 25%, #fbb817 25% 50%, #2aa9c0 50% 75%, #3f8f4e 75% 100%);
+}
+
+/* 譜面の紙：上の端に紅型の色の帯 */
+.paper-okinawa {
+  background:
+    linear-gradient(90deg, #c8452b 0 25%, #fbb817 25% 50%, #2aa9c0 50% 75%, #3f8f4e 75% 100%) top / 100% 4px no-repeat,
+    #fffdf6;
+}
+
+/* 三線の胴の蛇皮（ニシキヘビの鱗のような模様） */
+.jabi {
+  background-color: #3b3324;
+  background-image:
+    radial-gradient(ellipse 7px 5px at 50% 50%, #8c7a52 45%, transparent 50%),
+    radial-gradient(ellipse 7px 5px at 50% 50%, #6d5d3d 45%, transparent 50%);
+  background-size: 16px 12px, 16px 12px;
+  background-position: 0 0, 8px 6px;
 }

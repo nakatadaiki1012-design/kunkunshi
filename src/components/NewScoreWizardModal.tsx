@@ -100,7 +100,7 @@ export const NewScoreWizardModal: React.FC<NewScoreWizardModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-200 pb-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-red-800 text-white shadow-sm">
               <FilePlus className="h-5 w-5" />
             </div>
             <div>
@@ -122,7 +122,7 @@ export const NewScoreWizardModal: React.FC<NewScoreWizardModalProps> = ({
         </div>
 
         {/* 1-Click Shortcut Banner */}
-        <div className="mt-4 rounded-xl bg-gradient-to-r from-emerald-50 via-teal-50 to-stone-50 border border-emerald-200/80 p-3 flex items-center justify-between gap-2">
+        <div className="mt-4 rounded-xl bg-gradient-to-r from-indigo-50 via-amber-50 to-stone-50 border border-indigo-200/80 p-3 flex items-center justify-between gap-2">
           <div className="text-xs text-emerald-950">
             <span className="font-bold flex items-center gap-1 text-emerald-800">
               <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> 最も一般的な設定ですぐ開始:

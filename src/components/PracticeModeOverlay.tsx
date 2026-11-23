@@ -131,7 +131,7 @@ export const PracticeModeOverlay: React.FC<PracticeModeOverlayProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#edece8] text-stone-900 select-none animate-in fade-in-50 duration-200">
+    <div className="fixed inset-0 z-50 flex flex-col okinawa-bg text-stone-900 select-none animate-in fade-in-50 duration-200">
       {/* Top Floating Sleek Bar (Title, Tuning, Close) */}
       <div className="flex items-center justify-between px-3 py-2 bg-stone-900/90 text-stone-100 backdrop-blur-md shadow-md z-20 text-xs">
         <div className="flex items-center gap-3">

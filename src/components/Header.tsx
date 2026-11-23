@@ -62,14 +62,28 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="flex flex-col gap-1.5 rounded-xl border border-stone-200/90 bg-white/95 px-2.5 sm:px-3 py-1 sm:py-1.5 shadow-2xs backdrop-blur-md no-print transition-all">
+    <header className="flex flex-col gap-1.5 overflow-hidden rounded-xl border border-indigo-900/20 bg-stone-50/95 px-2.5 sm:px-3 pb-1 sm:pb-1.5 shadow-sm backdrop-blur-md no-print transition-all">
+      {/* ミンサー織の帯（五つと四つの絣） */}
+      <div className="minsa-band -mx-2.5 sm:-mx-3" aria-hidden="true" />
       {/* Top row: Brand & Primary Modals */}
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <div className="flex items-center gap-1.5" title="工工四エディタ">
-          <div className="flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-800 to-amber-950 text-white shadow-xs">
-            <span className="font-score font-extrabold text-xs sm:text-sm">工</span>
+          {/* 赤瓦の色に、ハイビスカスの花 */}
+          <div className="relative flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-600 to-red-800 text-white shadow-xs ring-1 ring-amber-400/60">
+            <span className="font-score font-extrabold text-sm sm:text-base leading-none">工</span>
+            <svg viewBox="0 0 20 20" className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5" aria-hidden="true">
+              <g fill="#fbb817">
+                {[0, 72, 144, 216, 288].map(r => (
+                  <ellipse key={r} cx="10" cy="5" rx="3.4" ry="4.6" transform={`rotate(${r} 10 10)`} />
+                ))}
+              </g>
+              <circle cx="10" cy="10" r="2" fill="#c8452b" />
+            </svg>
           </div>
-          <span className="font-score font-bold text-xs text-stone-700 hidden md:inline">工工四エディタ</span>
+          <span className="hidden md:flex flex-col leading-none">
+            <span className="font-score font-bold text-sm text-indigo-900">工工四エディタ</span>
+            <span className="text-[9px] tracking-widest text-red-700 font-bold">くんくんしー</span>
+          </span>
           <div className="flex items-center gap-1">
             <input
               type="text"

@@ -85,6 +85,9 @@ export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectS
         <div className="overflow-x-auto">
           {/* 棹：左が天（糸巻き側）、右が胴側 */}
           <div className="relative min-w-[520px] rounded-lg bg-gradient-to-b from-stone-800 via-black to-stone-800 border-y-2 border-amber-900/70 shadow-inner" style={{ height: 156 }}>
+            {/* 胴（蛇皮張り）と駒（ウマ） */}
+            <div className="jabi absolute right-0 top-0 bottom-0 w-[14%] rounded-r-lg border-l-4 border-stone-950" aria-hidden="true" />
+            <div className="absolute right-[6%] top-3 bottom-3 w-1.5 rounded bg-amber-200/90 shadow" aria-hidden="true" />
             {/* 上駒 */}
             <div className="absolute left-[3%] top-2 bottom-2 w-1 rounded bg-amber-100/70" />
             {[2, 1, 0].map((str, row) => {
@@ -127,7 +130,7 @@ export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectS
             })}
           </div>
           <p className="mt-1 text-[10px] text-stone-400">
-            左が糸巻き側、右が胴側です。丸い印（勘所）を押すと音が鳴って、譜面のカーソルの位置に入ります。
+            左が糸巻き（カラクイ）側、右が胴側です。丸い印（勘所）を押すと音が鳴って、譜面のカーソルの位置に入ります。
           </p>
         </div>
       )}

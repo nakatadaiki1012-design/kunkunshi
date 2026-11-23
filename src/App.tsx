@@ -28,7 +28,7 @@ import {
   RIGHT_HAND_ORNS,
   InputDivType
 } from './types/kunkunshi';
-import { createSakuraScore } from './data/presetScores';
+import { createRyukyuEtudeScore } from './data/presetScores';
 import { sanshinSynth } from './audio/sanshinSynth';
 import { ScorePlayer, PlayerSettings, previewSlot as previewSlotAudio } from './audio/player';
 import { slotOffsetInBeat } from './audio/timeline';
@@ -53,12 +53,12 @@ function loadDraft(): KunkunshiScore {
   try {
     for (const key of [DRAFT_STORAGE_KEY, ...LEGACY_DRAFT_KEYS]) {
       const saved = localStorage.getItem(key);
-      if (saved) return normalizeScore(JSON.parse(saved), createSakuraScore());
+      if (saved) return normalizeScore(JSON.parse(saved), createRyukyuEtudeScore());
     }
   } catch {
     // 壊れた下書きは無視して見本から始める
   }
-  return createSakuraScore();
+  return createRyukyuEtudeScore();
 }
 
 const isEmptySlot = (sl: Slot) => !sl.notes.length && !sl.rest && !sl.tie && !sl.repeat1 && !sl.repeat2;
@@ -1561,7 +1561,7 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-[#edece8] print:bg-white print:min-h-0 text-stone-900 flex flex-col font-sans">
+    <div className="min-h-screen okinawa-bg print:bg-white print:min-h-0 text-stone-900 flex flex-col font-sans">
       {/* Container */}
       <div className="w-full max-w-[1360px] mx-auto p-2 sm:p-3 print:p-0 print:m-0 print:max-w-none flex flex-col gap-2">
         {/* Header (Top app bar with title, actions, and collapsible settings) */}
@@ -1599,7 +1599,7 @@ export default function App() {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className="w-full rounded-2xl border border-stone-300 bg-[#fdfcf8] p-3 sm:p-6 shadow-md overflow-x-auto overflow-y-auto max-h-[68vh] print:max-h-none print:border-none print:shadow-none print:p-0 print:bg-white touch-pan-x touch-pan-y flex justify-center items-start"
+          className="paper-okinawa w-full rounded-2xl border border-stone-300 p-3 sm:p-6 pt-4 sm:pt-7 shadow-md overflow-x-auto overflow-y-auto max-h-[68vh] print:max-h-none print:border-none print:shadow-none print:p-0 print:bg-white touch-pan-x touch-pan-y flex justify-center items-start"
         >
           {score.view.layout === 'vertical' ? (
             <div className="min-w-fit mx-auto flex justify-center print:min-w-0 print:w-full">

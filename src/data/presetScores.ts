@@ -140,7 +140,7 @@ export function createRyukyuEtudeScore(): KunkunshiScore {
       '老 合 - ○',
       '工 六 七 八',
       '七.六 工 尺 -',
-      '上 尺 工.ス 六',
+      '上 尺 工:ス 六',
       '工 - 合+工 ○',
       '四 上:打 尺 工',
       '六 七.六:掛 工 -',
@@ -153,6 +153,15 @@ export function createRyukyuEtudeScore(): KunkunshiScore {
 }
 
 export const PRESET_SONGS: PresetSongInfo[] = [
+  {
+    id: 'ryukyu-etude',
+    title: '琉球音階の練習',
+    subtitle: '練習曲（オリジナル）',
+    composer: '',
+    description: '沖縄らしい音階（合・老・四・上・尺・工 ＝ ド・ミ・ファ・ソ・シ・ド）と、合わせ・スクイ・打・掛 の例。',
+    tuningName: '4本 本調子',
+    score: createRyukyuEtudeScore
+  },
   {
     id: 'kirakira',
     title: 'きらきら星',
@@ -170,14 +179,5 @@ export const PRESET_SONGS: PresetSongInfo[] = [
     description: '中弦と女弦を行き来する練習に。七.六 のように1マスを2つに分けた音も出てきます。',
     tuningName: '4本 本調子',
     score: createSakuraScore
-  },
-  {
-    id: 'ryukyu-etude',
-    title: '琉球音階の練習',
-    subtitle: '練習曲（オリジナル）',
-    composer: '',
-    description: '沖縄らしい音階（合・老・四・上・尺・工 ＝ ド・ミ・ファ・ソ・シ・ド）と、合わせ・スクイ・打・掛 の例。',
-    tuningName: '4本 本調子',
-    score: createRyukyuEtudeScore
   }
 ];

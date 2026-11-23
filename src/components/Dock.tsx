@@ -302,7 +302,9 @@ export const Dock: React.FC<DockProps> = ({
   );
 
   return (
-    <div className="w-full rounded-xl sm:rounded-2xl border border-stone-300/80 bg-stone-50/95 shadow-lg backdrop-blur-md no-print transition-all">
+    <div className="w-full overflow-hidden rounded-xl sm:rounded-2xl border border-indigo-900/20 bg-stone-50/95 shadow-lg backdrop-blur-md no-print transition-all">
+      {/* 紅型の色の細い帯 */}
+      <div className="bingata-stripe h-1" aria-hidden="true" />
       {/* Top Controller Bar (Playback, Lengths, Step Nav, Expand/Collapse) */}
       <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-1 px-2 py-1 sm:py-1.5 border-b border-stone-200 text-xs">
         {/* Left: Play / Stop / Step Navigation */}
