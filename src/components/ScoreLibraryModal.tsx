@@ -5,7 +5,7 @@
 
 import { useModal } from '../hooks/useModal';
 import React, { useState, useEffect } from 'react';
-import { KunkunshiScore, createEmptyScore } from '../types/kunkunshi';
+import { KunkunshiScore, createEmptyScore, TUNING_PRESETS } from '../types/kunkunshi';
 import { PRESET_SONGS, PresetSongInfo } from '../data/presetScores';
 import { BookOpen, FolderHeart, Plus, Copy, Trash2, ArrowRight } from 'lucide-react';
 
@@ -95,7 +95,7 @@ export const ScoreLibraryModal: React.FC<ScoreLibraryModalProps> = ({
         <div className="flex items-center justify-between border-b border-stone-200 pb-3">
           <div>
             <h2 className="text-xl font-bold font-score text-stone-900">楽曲ライブラリ</h2>
-            <p className="text-xs text-stone-500 mt-0.5">古典名曲プリセットの読み込みとマイ譜面保存</p>
+            <p className="text-xs text-stone-500 mt-0.5">見本の曲の読み込みと、自分の曲の保存</p>
           </div>
           <button
             onClick={onClose}
@@ -109,7 +109,7 @@ export const ScoreLibraryModal: React.FC<ScoreLibraryModalProps> = ({
           {/* Classical Preset Pieces */}
           <div>
             <h3 className="text-xs font-bold text-stone-700 flex items-center gap-1.5 mb-2.5">
-              <BookOpen className="h-4 w-4 text-amber-700" /> 古典・お手本楽曲プリセット
+              <BookOpen className="h-4 w-4 text-amber-700" /> 見本の曲
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {PRESET_SONGS.map(song => (
@@ -177,7 +177,7 @@ export const ScoreLibraryModal: React.FC<ScoreLibraryModalProps> = ({
                     <div>
                       <div className="font-bold text-sm text-stone-900 font-score">{saved.title || '無題'}</div>
                       <div className="text-[11px] text-stone-500">
-                        {saved.tuning?.preset}・♩={saved.tempo}・{saved.measures.length}小節
+                        {TUNING_PRESETS[saved.tuning?.preset]?.name || 'カスタム'}・♩={saved.tempo}・{saved.measures.length}小節
                         {saved.updatedAt && ` · ${new Date(saved.updatedAt).toLocaleDateString()}`}
                       </div>
                     </div>
