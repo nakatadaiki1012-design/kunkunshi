@@ -33,7 +33,7 @@ export interface Kandokoro {
 /**
  * 勘所の一覧。並びは「男弦 → 中弦 → 女弦」、それぞれ低い順。
  * 音の高さは、本調子（合＝ド）で一般的な ドレミ表に合わせている：
- *   男弦 合ド 乙レ 老ミ 下老ファ ／ 中弦 四ファ 上ソ 中ラ 尺シ ／ 女弦 工ド 五レ 六ミ 七ファ 八ソ 九ラ
+ *   男弦 合ド 乙レ 老ミ 下老ファ ／ 中弦 四ファ 上ソ 中ラ 尺シ♭ ／ 女弦 工ド 五レ 六ミ 七ファ 八ソ 九ラ
  */
 export const KANDOKORO: readonly Kandokoro[] = [
   { name: '合', yomi: 'あい', str: 0, off: 0, finger: '開放' },
@@ -43,7 +43,7 @@ export const KANDOKORO: readonly Kandokoro[] = [
   { name: '四', yomi: 'し', str: 1, off: 0, finger: '開放' },
   { name: '上', yomi: 'じょう', str: 1, off: 2, finger: '人差指' },
   { name: '中', yomi: 'ちゅう', str: 1, off: 4, finger: '中指' },
-  { name: '尺', yomi: 'しゃく', str: 1, off: 6, finger: '小指' },
+  { name: '尺', yomi: 'しゃく', str: 1, off: 5, finger: '人差指' },
   { name: '工', yomi: 'こう', str: 2, off: 0, finger: '開放' },
   { name: '五', yomi: 'ご', str: 2, off: 2, finger: '人差指' },
   { name: '六', yomi: 'ろく', str: 2, off: 4, finger: '中指' },
@@ -142,7 +142,7 @@ export const ORN_MARKS: Record<LeftHandOrn | RightHandOrn, string> = {
 };
 
 export const ORN_LABELS: Record<string, { short: string; label: string; desc: string; key: string }> = {
-  oshi1: { short: '♯', label: '半音上げ', desc: '勘所を少し上（棹の胴側）で押さえ、半音高くする（尺♯ など）', key: 'Z' },
+  oshi1: { short: '♯', label: '半音上げ', desc: '勘所を少し上（棹の胴側）で押さえ、半音高くする（尺♯＝シ など）', key: 'Z' },
   oshi2: { short: '♭', label: '半音下げ', desc: '勘所を少し下で押さえ、半音低くする', key: 'X' },
   uchi: { short: '打', label: '打音（ウチ）', desc: 'バチで弾かず、左手の指で弦を打って鳴らす（ハンマリング）', key: 'U' },
   kake: { short: '掛', label: '掛音（カキ）', desc: 'バチで弾かず、押さえていた指で弦を引っ掛けて鳴らす（プリング）', key: 'K' },

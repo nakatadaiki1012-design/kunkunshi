@@ -21,7 +21,7 @@ export interface PresetSongInfo {
  *   「七.六」 … 1拍を2つに分ける（8分音符2つ）
  *   「合+工」 … 同時に弾く（合わせ）
  *   「-」 … 前の音を延ばす（空きマス）  「○」 … 休符
- *   音の後ろに「:ス」「:打」「:掛」などを付けると奏法
+ *   音の後ろに「:ス」「:打」「:掛」などを付けると奏法、「:♯」「:♭」で半音上げ下げ
  */
 const ORN_BY_MARK: Record<string, string> = { ス: 'sukui', 打: 'uchi', 掛: 'kake', 押: 'ato', 摺: 'suri', ユ: 'yuri', 止: 'keshi' };
 
@@ -42,6 +42,8 @@ function parseBeat(tok: string): Beat {
       .map(n => POSITION_NAMES.indexOf(n))
       .filter(n => n >= 0);
     marks.forEach(mk => {
+      if (mk === '♯') slot.oshi = 1;
+      if (mk === '♭') slot.oshi = 2;
       const key = ORN_BY_MARK[mk];
       if (key) (slot as any)[key] = true;
     });
@@ -66,7 +68,7 @@ function buildScore(base: Partial<KunkunshiScore>, bars: string[], lyrics: strin
   return s;
 }
 
-/** さくらさくら（日本古謡）を三線に移したもの。ラ＝E（六）にすると、すべて ふつうの勘所で弾ける */
+/** さくらさくら（日本古謡）を三線に移したもの。ラ＝E（六）。シ（B）は「尺♯」で弾く */
 export function createSakuraScore(): KunkunshiScore {
   return buildScore(
     { id: 'sakura', title: 'さくらさくら', subtitle: '日本古謡', composer: '', tempo: 72 },
@@ -75,16 +77,16 @@ export function createSakuraScore(): KunkunshiScore {
       '六 六 七 -',
       '六 七 八 七',
       '六 七.六 工 -',
-      '尺 上 尺 工',
-      '尺 尺.上 四 -',
+      '尺:♯ 上 尺:♯ 工',
+      '尺:♯ 尺:♯.上 四 -',
       '六 七 八 七',
       '六 七.六 工 -',
-      '尺 上 尺 工',
-      '尺 尺.上 四 -',
+      '尺:♯ 上 尺:♯ 工',
+      '尺:♯ 尺:♯.上 四 -',
       '六 六 七 -',
       '六 六 七 -',
-      '尺 工 七.六 工',
-      '尺:ユ - - ○'
+      '尺:♯ 工 七.六 工',
+      '尺:♯:ユ - - ○'
     ],
     [
       'さ く ら _',
@@ -129,25 +131,25 @@ export function createKirakiraScore(): KunkunshiScore {
   );
 }
 
-/** 琉球音階（ド・ミ・ファ・ソ・シ）の練習曲（このアプリのオリジナル）。合わせ・スクイ・打・掛 の例つき */
+/** 琉球音階（ド・ミ・ファ・ソ・シ）の練習曲（このアプリのオリジナル）。シは「尺♯」。合わせ・スクイ・打・掛 の例つき */
 export function createRyukyuEtudeScore(): KunkunshiScore {
   return buildScore(
     { id: 'ryukyu-etude', title: '琉球音階の練習', subtitle: '練習曲', composer: 'オリジナル', tempo: 84 },
     [
       '合 老 四 上',
-      '尺 工 - ○',
-      '工 尺 上 四',
+      '尺:♯ 工 - ○',
+      '工 尺:♯ 上 四',
       '老 合 - ○',
       '工 六 七 八',
-      '七.六 工 尺 -',
-      '上 尺 工:ス 六',
+      '七.六 工 尺:♯ -',
+      '上 尺:♯ 工:ス 六',
       '工 - 合+工 ○',
-      '四 上:打 尺 工',
+      '四 上:打 尺:♯ 工',
       '六 七.六:掛 工 -',
       '八 七 六 工',
-      '尺 上 四 -',
+      '尺:♯ 上 四 -',
       '合 老 四 上',
-      '尺 工 合+工 -'
+      '尺:♯ 工 合+工 -'
     ]
   );
 }
@@ -240,7 +242,7 @@ export const PRESET_SONGS: PresetSongInfo[] = [
     title: '琉球音階の練習',
     subtitle: '練習曲（オリジナル）',
     composer: '',
-    description: '沖縄らしい音階（合・老・四・上・尺・工 ＝ ド・ミ・ファ・ソ・シ・ド）と、合わせ・スクイ・打・掛 の例。',
+    description: '沖縄らしい音階（合・老・四・上・尺♯・工 ＝ ド・ミ・ファ・ソ・シ・ド）と、合わせ・スクイ・打・掛 の例。',
     tuningName: '4本 本調子',
     score: createRyukyuEtudeScore
   },

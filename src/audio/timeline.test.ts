@@ -95,10 +95,10 @@ test('ふつうの音は1回だけ鳴る。鳴らす弦は勘所の弦。♯で�
 test('♭は半音下がる', () => {
   const r = record();
   const sl = createNewSlot();
-  sl.notes = [7]; // 尺 = B3(59)
+  sl.notes = [7]; // 尺 = B♭3(58)
   sl.oshi = 2;
   voiceSlot(r.sink, sl, 0, 1, pitches, 0.5);
-  assert.equal(r.calls[0].midi, 58);
+  assert.equal(r.calls[0].midi, 57);
 });
 
 test('押し上げは弾いてから音程が動く。スリは下から入る', () => {

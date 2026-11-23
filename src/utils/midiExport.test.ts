@@ -74,8 +74,8 @@ test('合わせ（2本同時）は2音、♯は半音高くなる', async () => 
   const b = await bytesOf(s);
   const { noteOns } = parse(b);
   assert.equal(noteOns, 3);
-  // 尺（B3=59）の♯ → 60
+  // 尺（B♭3=58）の♯ → 59（シ）
   const notes: number[] = [];
   for (let i = 0; i < b.length - 2; i++) if (b[i] === 0x90 && b[i + 2] > 0) notes.push(b[i + 1]);
-  assert.deepEqual(notes, [48, 60, 60]);
+  assert.deepEqual(notes, [48, 60, 59]);
 });

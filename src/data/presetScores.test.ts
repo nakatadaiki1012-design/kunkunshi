@@ -31,3 +31,14 @@ test('見本の曲はすべて、知らない勘所の字を含まない（空�
     assert.ok(noteCount(s) > 10, song.title);
   }
 });
+
+test('琉球音階の練習・さくらさくらのシは「尺♯」（シ♭にならない）', async () => {
+  const { createRyukyuEtudeScore, createSakuraScore } = await import('./presetScores');
+  const { getPitches, noteName, accidentalOf } = await import('../types/kunkunshi');
+  for (const s of [createRyukyuEtudeScore(), createSakuraScore()]) {
+    const p = getPitches(s);
+    const shaku = s.measures.flatMap(m => m.beats.flatMap(b => b.slots)).filter(sl => sl.notes.includes(7));
+    assert.ok(shaku.length > 0);
+    assert.ok(shaku.every(sl => noteName(p[7] + accidentalOf(sl), false) === 'B'), s.title);
+  }
+});

@@ -12,13 +12,13 @@ import {
   POSITION_NAMES
 } from './kunkunshi';
 
-test('4本 本調子は C・F・C、勘所はドレミ表どおり', () => {
+test('4本 本調子は C・F・C、勘所はドレミ表どおり（工がドのとき尺はシ♭）', () => {
   const s = createEmptyScore();
   assert.deepEqual(getOpenStrings(s).map(p => noteName(p, false)), ['C', 'F', 'C']);
   const byName = Object.fromEntries(getPitches(s).map((p, i) => [POSITION_NAMES[i], noteName(p, false)]));
   assert.deepEqual(byName, {
     合: 'C', 乙: 'D', 老: 'E', 下老: 'F',
-    四: 'F', 上: 'G', 中: 'A', 尺: 'B',
+    四: 'F', 上: 'G', 中: 'A', 尺: 'B♭',
     工: 'C', 五: 'D', 六: 'E', 七: 'F', 八: 'G', 九: 'A'
   });
   // 工は合の1オクターブ上
