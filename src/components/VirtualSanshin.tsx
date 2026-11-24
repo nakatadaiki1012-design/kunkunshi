@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import {
   KunkunshiScore,
   KANDOKORO,
@@ -16,12 +16,19 @@ import {
 import { sanshinSynth } from '../audio/sanshinSynth';
 import { X, ChevronDown, ChevronUp } from 'lucide-react';
 
+// 3Dの手（three.js）は大きいので、開いた時だけ読み込む
+const Hand3DPanel = lazy(() => import('./Hand3DPanel'));
+
 interface VirtualSanshinProps {
   score: KunkunshiScore;
   /** 勘所を押したとき（勘所の番号） */
   onSelectString?: (pos: number) => void;
   /** いまのマスに入っている勘所の番号 */
   activeStrings?: number[];
+  /** いまのマスの ♯・♭（0=なし 1=♯ 2=♭） */
+  activeOshi?: number;
+  /** 演奏中か */
+  playing?: boolean;
   onClose?: () => void;
 }
 
@@ -32,11 +39,26 @@ const xOf = (off: number) => (off === 0 ? 4 : 4 + (1 - Math.pow(2, -off / 12)) *
  * 仮想三線：棹（さお）を横に寝かせた図。上から 女弦・中弦・男弦。
  * 勘所を押すと音が鳴って譜面に入る。再生中は鳴っている弦が光る。
  */
-export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectString, activeStrings = [], onClose }) => {
+export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectString, activeStrings = [], activeOshi = 0, playing = false, onClose }) => {
   const pitches = getPitches(score);
   const open = getOpenStrings(score);
   const [vibrating, setVibrating] = useState<Record<number, boolean>>({});
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mode, setMode] = useState<'hand' | 'board'>(() => {
+    try {
+      return localStorage.getItem('kunkunshi.sanshinMode') === 'board' ? 'board' : 'hand';
+    } catch {
+      return 'hand';
+    }
+  });
+  const changeMode = (m: 'hand' | 'board') => {
+    setMode(m);
+    try {
+      localStorage.setItem('kunkunshi.sanshinMode', m);
+    } catch {
+      // 保存できなくても動く
+    }
+  };
 
   useEffect(() => {
     // 音源が弦を鳴らしたら、その弦を光らせる
@@ -60,7 +82,20 @@ export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectS
       <div className="flex items-center justify-between text-xs text-amber-200/90 pb-1.5">
         <div className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
-          <span className="font-score font-bold text-sm text-amber-100">仮想三線（勘所）</span>
+          <span className="font-score font-bold text-sm text-amber-100">仮想三線</span>
+          <div className="inline-flex rounded-md border border-stone-700 bg-stone-900 p-0.5">
+            {([['hand', '3Dの手'], ['board', '棹の図']] as const).map(([k, l]) => (
+              <button
+                key={k}
+                onClick={() => changeMode(k)}
+                className={`rounded px-2 py-0.5 text-[11px] font-bold cursor-pointer ${
+                  mode === k ? 'bg-amber-400 text-stone-950' : 'text-amber-100 hover:text-white'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
           <span className="hidden sm:inline text-[11px] text-stone-400">
             {STRING_NAMES.map((n, i) => `${n} ${noteName(open[i], false)}`).join('・')}
           </span>
@@ -81,7 +116,13 @@ export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectS
         </div>
       </div>
 
-      {!isCollapsed && (
+      {!isCollapsed && mode === 'hand' && (
+        <Suspense fallback={<div className="py-10 text-center text-sm text-amber-100">3Dの手を読み込んでいます…</div>}>
+          <Hand3DPanel notes={activeStrings} oshi={activeOshi} playing={playing} />
+        </Suspense>
+      )}
+
+      {!isCollapsed && mode === 'board' && (
         <div className="overflow-x-auto">
           {/* 棹：左が天（糸巻き側）、右が胴側 */}
           <div className="relative min-w-[520px] rounded-lg bg-gradient-to-b from-stone-800 via-black to-stone-800 border-y-2 border-amber-900/70 shadow-inner" style={{ height: 156 }}>

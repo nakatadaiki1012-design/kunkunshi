@@ -31,7 +31,7 @@ import {
 import { createTinsaguScore } from './data/presetScores';
 import { sanshinSynth } from './audio/sanshinSynth';
 import { ScorePlayer, PlayerSettings, previewSlot as previewSlotAudio } from './audio/player';
-import { slotOffsetInBeat } from './audio/timeline';
+import { slotOffsetInBeat, resolveSlot } from './audio/timeline';
 import { Header } from './components/Header';
 import { Dock } from './components/Dock';
 import { MeasureNavigator } from './components/MeasureNavigator';
@@ -1538,6 +1538,20 @@ export default function App() {
     return has(c) ? c : null;
   })();
   const ornTargetSlot = ornTargetPos ? score.measures[ornTargetPos.m].beats[ornTargetPos.b].slots[ornTargetPos.s] : null;
+  // 3Dの手に見せる音：演奏中は鳴っているマス（くり返し記号は元の音）、止まっている時は入れたばかりの音かカーソルのマス。
+  // 延ばし・空きマスでは、前の音を押さえたままにする
+  const handSlotRef = useRef<Slot | null>(null);
+  const handSlot = (() => {
+    // 止まっている時は、入れたばかりの音（無ければカーソルのある音の入ったマス）＝奏法の行と同じ相手
+    let sl: Slot | null = ornTargetSlot || curSlot;
+    if (currentPlayKey) {
+      const [m, b, s] = currentPlayKey.split('-').map(Number);
+      sl = resolveSlot(score, m, b, s);
+    }
+    if (sl && (sl.notes.length || sl.rest)) handSlotRef.current = sl;
+    else if (!currentPlayKey) handSlotRef.current = sl;
+    return handSlotRef.current;
+  })();
   const stringNamesNow = getStringNames();
   const ornTarget = ornTargetSlot
     ? {
@@ -1728,7 +1742,9 @@ export default function App() {
             <VirtualSanshin
               score={score}
               onSelectString={inputString}
-              activeStrings={curSlot?.notes || []}
+              activeStrings={handSlot?.notes || []}
+              activeOshi={handSlot?.oshi || 0}
+              playing={isPlaying}
               onClose={() => mutateScore(d => (d.view.showSanshinBoard = false), { history: false })}
             />
           </div>
