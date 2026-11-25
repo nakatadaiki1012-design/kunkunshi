@@ -32,7 +32,7 @@ import { createTinsaguScore } from './data/presetScores';
 import { sanshinSynth } from './audio/sanshinSynth';
 import { ScorePlayer, PlayerSettings, previewSlot as previewSlotAudio } from './audio/player';
 import { slotOffsetInBeat, resolveSlot } from './audio/timeline';
-import { choosePosition } from './hand3d/chord.js';
+import { choosePosition } from './utils/fingering.js';
 import { Header } from './components/Header';
 import { Dock } from './components/Dock';
 import { MeasureNavigator } from './components/MeasureNavigator';

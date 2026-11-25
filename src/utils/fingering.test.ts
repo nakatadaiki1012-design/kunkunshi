@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chordFromNotes } from './chord.js';
+import { chordFromNotes } from './fingering.js';
 import { POSITION_NAMES } from '../types/kunkunshi';
 
 const pos = (name: string) => POSITION_NAMES.indexOf(name);
@@ -31,7 +31,7 @@ test('合わせで同じ指が重なる時は、別の指に替える（上＋�
 });
 
 test('本手では 尺・七・下老 は小指、尺位では人差指', async () => {
-  const { choosePosition } = await import('./chord.js');
+  const { choosePosition } = await import('./fingering.js');
   assert.deepEqual(chordFromNotes([pos('七')]).fingers, [0, 0, 4]);
   assert.deepEqual(chordFromNotes([pos('尺')], 0, { position: 'shaku' }).fingers, [0, 1, 0]);
   assert.deepEqual(chordFromNotes([pos('八')], 0, { position: 'shaku' }).fingers, [0, 0, 2]);
