@@ -1,10 +1,13 @@
 /* =========================================================
    三線の3Dモデル（実寸に近い形）
-   棹（さお）・天（ちら）・カラクイ（糸巻き）・胴（ちーが・蛇皮張り）・ティーガー（胴巻き）・ウマ（駒）・弦3本
+   天（チラ）・カラクイ（糸巻き）・上駒（ウチジル）・棹・野坂（スンウリ）・鳩胸（ウトゥチカラ）・
+   胴（チーガ・蛇皮張り）・ティーガー（胴巻き）・ウマ（駒）・棹の先（糸を掛ける所）・弦3本
+   寸法の目安：全長 約800 / 棹の長さ（上駒〜胴）約479 / 胴 約180×190・厚み 約85 / 弦長 約610
    座標は geom.js と同じ：x = 上駒→胴 / y = 男弦（天井側）→女弦（床側） / z = 棹の表（客席側）
    ========================================================= */
 import * as THREE from 'three';
-import { fretX, halfW, strY, STRING_R, stringZ, NECK_DEPTH, BODY_X0, BODY_LEN, BODY_W, BODY_DEPTH, UMA_X, HEAD_LEN } from './geom.js';
+import { fretX, halfW, strY, STRING_R, stringZ, NECK_DEPTH, BODY_X0, BODY_LEN, BODY_W, BODY_DEPTH, UMA_X, HEAD_LEN, TAIL_LEN } from './geom.js';
+import { FINGER_COLORS } from './chord.js';
 
 /* ---------- 絵（その場で描く） ---------- */
 function canvasTex(w, h, draw){
@@ -14,18 +17,16 @@ function canvasTex(w, h, draw){
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
-// 蛇皮（ニシキヘビの鱗）
+// 蛇皮（ニシキヘビの鱗とまだら模様）
 const snakeTex = () => canvasTex(512, 512, (g, w, h) => {
   g.fillStyle = '#2d2617'; g.fillRect(0, 0, w, h);
   let seed = 7; const r = () => ((seed = (seed*16807) % 2147483647) - 1) / 2147483646;
-  // 大きなまだら模様
   for(let i=0;i<26;i++){
     const x = r()*w, y = r()*h, rx = 30 + r()*55, ry = 20 + r()*35;
     const gr = g.createRadialGradient(x, y, 2, x, y, rx);
     gr.addColorStop(0, 'rgba(185,160,105,0.85)'); gr.addColorStop(0.7, 'rgba(120,100,60,0.55)'); gr.addColorStop(1, 'rgba(45,38,23,0)');
     g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, rx, ry, r()*3, 0, 7); g.fill();
   }
-  // 細かい鱗
   for(let y=0; y<h+12; y+=11) for(let x=(y/11)%2 ? 7 : 0; x<w+14; x+=14){
     g.strokeStyle = 'rgba(20,16,8,0.55)'; g.lineWidth = 1.2;
     g.beginPath(); g.ellipse(x, y, 6.2, 5, 0, 0, 7); g.stroke();
@@ -33,33 +34,74 @@ const snakeTex = () => canvasTex(512, 512, (g, w, h) => {
   }
 });
 // ティーガー（胴巻き）：紅型のような色の帯
-const tiigaaTex = () => canvasTex(1024, 64, (g, w, h) => {
+const tiigaaTex = () => canvasTex(1024, 96, (g, w, h) => {
   g.fillStyle = '#b8322a'; g.fillRect(0, 0, w, h);
-  g.fillStyle = '#fbb817'; g.fillRect(0, 6, w, 5); g.fillRect(0, h-11, w, 5);
-  for(let x=0; x<w; x+=64){
-    g.fillStyle = '#1f6f8b'; g.beginPath(); g.arc(x+32, h/2, 12, 0, 7); g.fill();
+  g.fillStyle = '#fbb817'; g.fillRect(0, 8, w, 6); g.fillRect(0, h-14, w, 6);
+  g.fillStyle = '#1f6f8b'; g.fillRect(0, 0, w, 4); g.fillRect(0, h-4, w, 4);
+  for(let x=0; x<w; x+=80){
+    g.fillStyle = '#1f6f8b'; g.beginPath(); g.arc(x+40, h/2, 16, 0, 7); g.fill();
     g.fillStyle = '#fff3d6';
-    for(let k=0;k<5;k++){ const a = k*1.2566; g.beginPath(); g.ellipse(x+32+Math.cos(a)*7, h/2+Math.sin(a)*7, 5, 3, a, 0, 7); g.fill(); }
-    g.fillStyle = '#fbb817'; g.beginPath(); g.arc(x+32, h/2, 3, 0, 7); g.fill();
+    for(let k=0;k<5;k++){ const a = k*1.2566; g.beginPath(); g.ellipse(x+40+Math.cos(a)*9, h/2+Math.sin(a)*9, 7, 4, a, 0, 7); g.fill(); }
+    g.fillStyle = '#fbb817'; g.beginPath(); g.arc(x+40, h/2, 4, 0, 7); g.fill();
   }
 });
 
-/* ---------- 棹の断面：表は平ら、横は5mmまっすぐ、裏は丸い（thumb.js の neckSD と同じ形） ---------- */
-function neckRing(x){
-  const hw = halfW(x), dpt = NECK_DEPTH(x), pts = [];
-  pts.push([hw, 0], [-hw, 0], [-hw, -5]);
-  for(let i=1;i<16;i++){ const a = Math.PI + i/16*Math.PI; pts.push([Math.cos(a)*hw, -5 + Math.sin(a)*dpt]); }
-  pts.push([hw, -5]);
+/* ---------- 棹・天を1本の形として作る ----------
+   中心の線にそって、断面（表は平ら・横は少しまっすぐ・裏は丸い）を並べる。
+   天（上駒より先）は後ろへ反りながら少し細く・薄くなる。胴の手前は野坂（表）と鳩胸（裏）で広がる */
+const HEAD_BEND = 0.0028;                        // 天の反り（先へ行くほど強く後ろへ）
+// 天の中心の線：上駒から先へ s mm 進んだ所（x は負の向き、z は後ろへ）
+export function headPoint(s){ return [-s, 0, -HEAD_BEND*s*s]; }
+function headTangent(s){ const t = [-1, 0, -2*HEAD_BEND*s], l = Math.hypot(t[0], t[2]); return [t[0]/l, 0, t[2]/l]; }
+
+// 断面の形（y：横、z：表からの高さ。表が z=0）
+function section(hw, dpt){
+  const pts = [];
+  const r = 1.6;                                   // 表の角の丸み
+  pts.push([hw - r, 0], [-(hw - r), 0], [-hw, -r], [-hw, -5]);
+  for(let i=1;i<18;i++){ const a = Math.PI + i/18*Math.PI; pts.push([Math.cos(a)*hw, -5 + Math.sin(a)*dpt]); }
+  pts.push([hw, -5], [hw, -r]);
   return pts;
 }
-function buildNeck(mat){
-  const xs = []; for(let x=-6; x<=BODY_X0+BODY_LEN+12; x+=12) xs.push(x);
-  const ring0 = neckRing(0), n = ring0.length;
-  const pos = [], idx = [];
-  xs.forEach(x => neckRing(x).forEach(([y, z]) => pos.push(x, y, z)));
-  for(let i=0;i<xs.length-1;i++) for(let k=0;k<n;k++){
+function neckShape(x){
+  let hw = halfW(x), dpt = NECK_DEPTH(x);
+  // 野坂・鳩胸：胴の手前50mmで、表は横へ、裏は後ろへ広がる
+  const e = Math.min(1, Math.max(0, (x - (BODY_X0 - 50))/50));
+  hw += 8*e*e; dpt += 16*e*e;
+  // 胴の下に出る棹の先は、少し細く丸める
+  const tail = Math.max(0, x - (BODY_X0 + BODY_LEN));
+  if(tail > 0){ hw = halfW(BODY_X0) - tail*0.15; dpt = NECK_DEPTH(BODY_X0) - tail*0.2; }
+  return section(hw, dpt);
+}
+function buildNeckAndHead(mat){
+  const rings = [];       // { c:中心, T:進む向き, N:表の向き, prof:断面 }
+  // 天の先（上駒から HEAD_LEN 先）→ 上駒
+  for(let i=0;i<=22;i++){
+    const s = HEAD_LEN*(1 - i/22);
+    const T = headTangent(s).map(v => -v);                               // 胴の向きへ進む
+    const N = [ -T[2], 0, T[0] ];                                       // 表の向き（T を y 軸まわりに90°）
+    const k = s/HEAD_LEN;
+    // 天は先へ行くほど少し細く・薄く。いちばん先は丸く閉じる
+    const end = Math.max(0, (k - 0.9)/0.1);
+    const hw = (halfW(0) - k*2.2) * Math.sqrt(Math.max(0.05, 1 - end*end));
+    const dpt = (NECK_DEPTH(0) - k*5) * Math.sqrt(Math.max(0.05, 1 - end*end));
+    rings.push({ c: headPoint(s), N, prof: section(hw, dpt) });
+  }
+  // 上駒 → 胴を通りぬけて、胴の下の棹の先まで
+  const xEnd = BODY_X0 + BODY_LEN + TAIL_LEN;
+  for(let x=3; x<=xEnd; x+=(x > BODY_X0 - 60 && x < BODY_X0 + 10) ? 5 : 15){
+    // 胴の中では、棹の表を蛇皮より少し下げる（同じ高さだと、ちらついて見える）
+    const sink = x > BODY_X0 + 2 ? -4 : 0;
+    rings.push({ c: [x, 0, sink], N: [0, 0, 1], prof: neckShape(x) });
+  }
+  rings.push({ c: [xEnd + 3, 0, -6], N: [0, 0, 1], prof: section(3, 4) });     // 先を丸く閉じる
+  const n = rings[0].prof.length, pos = [], idx = [];
+  for(const { c, N, prof } of rings){
+    for(const [y, z] of prof) pos.push(c[0] + N[0]*z, c[1] + y, c[2] + N[2]*z);
+  }
+  for(let i=0;i<rings.length-1;i++) for(let k=0;k<n;k++){
     const a = i*n + k, b = i*n + (k+1)%n, c = (i+1)*n + k, d = (i+1)*n + (k+1)%n;
-    idx.push(a, c, b, b, c, d);
+    idx.push(a, b, c, b, d, c);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -68,104 +110,112 @@ function buildNeck(mat){
   return m;
 }
 
+/* ---------- カラクイ（糸巻き）：回転体。天を横に貫く細い軸と、つまむ所 ---------- */
+function karakuiGeometry(){
+  // [半径, 長さ方向の位置]（0 が天の中心、先へ行くほどプラス）
+  const prof = [[0,-16],[3.4,-16],[3.6,-8],[3.8,10],[5.8,12],[6.0,16],[4.6,18],[5.0,24],
+                [6.2,40],[7.0,58],[7.6,74],[8.0,86],[7.2,90],[8.2,93],[8.4,98],[6.5,104],[3.5,107],[0,108]];
+  return new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 24);
+}
+
 export function buildSanshin(){
   const group = new THREE.Group();
-  // 黒い漆塗りの棹（つやあり）
-  const lacquer = new THREE.MeshPhysicalMaterial({ color:'#0c0b0a', roughness:0.22, metalness:0, clearcoat:1, clearcoatRoughness:0.12, side: THREE.DoubleSide });
-  group.add(buildNeck(lacquer));
+  // 黒い漆塗り（つやあり）
+  const lacquer = new THREE.MeshPhysicalMaterial({ color:'#0c0b0a', roughness:0.42, metalness:0, clearcoat:0.55, clearcoatRoughness:0.38, envMapIntensity:0.35, side: THREE.DoubleSide });   // 映り込みが強すぎて白く光らないように
+  group.add(buildNeckAndHead(lacquer));
 
-  // 天（ちら）：上駒の先で、後ろへ反りながら細くなる
-  const headPts = [];
-  for(let i=0;i<=10;i++){ const t = i/10; headPts.push(new THREE.Vector3(-6 - t*HEAD_LEN, 0, -10 - t*t*55)); }
-  const headCurve = new THREE.CatmullRomCurve3(headPts);
-  const head = new THREE.Mesh(new THREE.TubeGeometry(headCurve, 24, 1, 12, false), lacquer);
-  // 太さを先へ行くほど細く（チューブを各段ごとに拡大縮小）
-  { const p = head.geometry.attributes.position, c = new THREE.Vector3();
-    for(let i=0;i<p.count;i++){ const seg = Math.floor(i/13), t = seg/24; headCurve.getPoint(t, c);
-      const k = 12 - t*5, dx = p.getX(i)-c.x, dy = p.getY(i)-c.y, dz = p.getZ(i)-c.z;
-      p.setXYZ(i, c.x + dx*k*0.9, c.y + dy*k, c.z + dz*k*0.9); }
-    head.geometry.computeVertexNormals(); }
-  head.castShadow = true; group.add(head);
-  // 上駒（うちじる）
-  const nut = new THREE.Mesh(new THREE.BoxGeometry(3, 2*halfW(0), 2.4), new THREE.MeshStandardMaterial({color:'#eadfc6', roughness:0.5}));
-  nut.position.set(-2, 0, 1.2); group.add(nut);
-  // カラクイ（糸巻き）3本：天の横から出る
-  const pegMat = new THREE.MeshPhysicalMaterial({ color:'#1a1210', roughness:0.35, clearcoat:0.8 });
-  [[ -45, -1], [-80, 1], [-112, -1]].forEach(([x, side]) => {
-    const c = new THREE.Vector3(); headCurve.getPoint(Math.min(1, (-6 - x)/HEAD_LEN), c);
-    // カラクイ：天を横に貫く細めの軸と、つまむ所（先へ太くなる）
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 40, 14), pegMat);
-    shaft.position.set(c.x, c.y + side*8, c.z); shaft.castShadow = true; group.add(shaft);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(side > 0 ? 7.5 : 4.2, side > 0 ? 4.2 : 7.5, 62, 16), pegMat);
-    grip.position.set(c.x, c.y + side*58, c.z); grip.castShadow = true; group.add(grip);
-    const knob = new THREE.Mesh(new THREE.SphereGeometry(7.6, 16, 12), pegMat);
-    knob.scale.set(1, 0.45, 1); knob.position.set(c.x, c.y + side*89, c.z); group.add(knob);
+  // 上駒（ウチジル）：象牙色の小さな駒
+  const nut = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2*halfW(0) - 1, 2.6), new THREE.MeshStandardMaterial({ color:'#eadfc6', roughness:0.45 }));
+  nut.position.set(-1.6, 0, 1.3); nut.castShadow = true; group.add(nut);
+
+  // カラクイ3本：男弦（天井側）・中弦（床側）・女弦（天井側）
+  const pegMat = new THREE.MeshPhysicalMaterial({ color:'#140e0b', roughness:0.32, clearcoat:0.7 });
+  const pegGeo = karakuiGeometry();
+  const PEGS = [{ s: 32, side: -1 }, { s: 64, side: 1 }, { s: 96, side: -1 }];
+  const pegAnchor = [];
+  PEGS.forEach(({ s, side }) => {
+    const c = headPoint(s), z = c[2] - 6;
+    const peg = new THREE.Mesh(pegGeo, pegMat);
+    peg.position.set(c[0], 0, z);
+    if(side < 0) peg.rotation.x = Math.PI;          // 天井側へ向ける（回転体の軸は y）
+    peg.castShadow = true; group.add(peg);
+    pegAnchor.push([c[0], side*2, z + 2]);          // 弦を巻く所（天の中）
   });
 
-  // 胴（ちーが）：角の丸い四角の木枠に、表と裏に蛇皮
-  const r = 34, L = BODY_LEN, W = BODY_W;
+  // 胴（チーガ）：角の丸い四角の木枠に、表と裏に蛇皮
+  const r = 30, L = BODY_LEN, W = BODY_W;
   const shape = new THREE.Shape();
   shape.moveTo(-L/2 + r, -W/2);
   shape.lineTo(L/2 - r, -W/2); shape.quadraticCurveTo(L/2, -W/2, L/2, -W/2 + r);
   shape.lineTo(L/2, W/2 - r);  shape.quadraticCurveTo(L/2, W/2, L/2 - r, W/2);
   shape.lineTo(-L/2 + r, W/2); shape.quadraticCurveTo(-L/2, W/2, -L/2, W/2 - r);
   shape.lineTo(-L/2, -W/2 + r); shape.quadraticCurveTo(-L/2, -W/2, -L/2 + r, -W/2);
-  const bodyGeo = new THREE.ExtrudeGeometry(shape, { depth: BODY_DEPTH, bevelEnabled: true, bevelThickness: 2, bevelSize: 2, bevelSegments: 2, curveSegments: 10 });
+  const bodyGeo = new THREE.ExtrudeGeometry(shape, { depth: BODY_DEPTH - 6, bevelEnabled: true, bevelThickness: 3, bevelSize: 3, bevelSegments: 3, curveSegments: 12 });
+  { const uv = bodyGeo.attributes.uv; for(let i=0;i<uv.count;i++) uv.setXY(i, uv.getX(i)/120, uv.getY(i)/120); }
   const skinTex = snakeTex(); skinTex.wrapS = skinTex.wrapT = THREE.RepeatWrapping;
   const skinMat = new THREE.MeshStandardMaterial({ map: skinTex, roughness: 0.6 });
-  const frameMat = new THREE.MeshStandardMaterial({ color:'#1b120c', roughness:0.4 });
-  // 表と裏（面）は蛇皮、側面は木枠
-  { const uv = bodyGeo.attributes.uv; for(let i=0;i<uv.count;i++) uv.setXY(i, uv.getX(i)/120, uv.getY(i)/120); }
+  const frameMat = new THREE.MeshStandardMaterial({ color:'#1b120c', roughness:0.35 });
   const body = new THREE.Mesh(bodyGeo, [skinMat, frameMat]);
-  body.position.set(BODY_X0 + L/2, 0, -BODY_DEPTH - 2);      // 表の蛇皮が棹の表と同じ高さ（z=0）
+  body.position.set(BODY_X0 + L/2, 0, -(BODY_DEPTH - 6) - 3);   // 表の蛇皮が z=0
   body.castShadow = body.receiveShadow = true;
   group.add(body);
-  // ティーガー（胴巻き）：胴の横まわりに巻いた布
-  const band = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: BODY_DEPTH*0.62, bevelEnabled: true, bevelThickness: 0, bevelSize: 3.5, bevelSegments: 1, curveSegments: 10 }),
-    [new THREE.MeshBasicMaterial({visible:false}), new THREE.MeshStandardMaterial({ map: tiigaaTex(), roughness: 0.85 })]);
+  // ティーガー（胴巻き）：胴の横まわりを、表と裏の縁を少し残して覆う布
+  const bandDepth = BODY_DEPTH*0.72;
+  const band = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: bandDepth, bevelEnabled: true, bevelThickness: 0, bevelSize: 4.2, bevelSegments: 1, curveSegments: 12 }),
+    [new THREE.MeshBasicMaterial({ visible: false }), new THREE.MeshStandardMaterial({ map: tiigaaTex(), roughness: 0.85 })]);
   { const g = band.geometry, uv = g.attributes.uv, p = g.attributes.position;
-    for(let i=0;i<uv.count;i++){ const a = Math.atan2(p.getY(i), p.getX(i)); uv.setXY(i, (a/(2*Math.PI)+0.5)*6, p.getZ(i)/(BODY_DEPTH*0.62)); } }
-  band.position.set(BODY_X0 + L/2, 0, -BODY_DEPTH*0.81 - 0.5);
+    for(let i=0;i<uv.count;i++){ const a = Math.atan2(p.getY(i), p.getX(i)); uv.setXY(i, (a/(2*Math.PI)+0.5)*6, p.getZ(i)/bandDepth); } }
+  band.position.set(BODY_X0 + L/2, 0, -BODY_DEPTH/2 - bandDepth/2);
   group.add(band);
 
-  // ウマ（駒）：竹の小さな駒
-  const uma = new THREE.Mesh(new THREE.BoxGeometry(4, 2*strY(2, UMA_X) + 12, stringZ(UMA_X)), new THREE.MeshStandardMaterial({ color:'#d9c08a', roughness:0.55 }));
-  uma.position.set(UMA_X, 0, stringZ(UMA_X)/2); uma.castShadow = true; group.add(uma);
+  // ウマ（駒）：竹の駒。下が広く上がせまい台形
+  const umaH = stringZ(UMA_X), umaW = 2*strY(2, UMA_X) + 12;
+  const umaShape = new THREE.Shape();
+  umaShape.moveTo(-umaW/2 - 5, 0); umaShape.lineTo(umaW/2 + 5, 0); umaShape.lineTo(umaW/2, umaH); umaShape.lineTo(-umaW/2, umaH); umaShape.closePath();
+  const umaGeo = new THREE.ExtrudeGeometry(umaShape, { depth: 5, bevelEnabled: false });
+  const uma = new THREE.Mesh(umaGeo, new THREE.MeshStandardMaterial({ color:'#d9c08a', roughness:0.55 }));
+  // 形の横（x）→ 弦をまたぐ向き（y）、形の縦（y）→ 高さ（z）、厚み（z）→ 棹の向き（x）
+  uma.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,1), new THREE.Vector3(1,0,0)));
+  uma.position.set(UMA_X - 2.5, 0, 0); uma.castShadow = true; group.add(uma);
 
-  // 勘所の目印（練習用のシールのような小さな点）。棹の床側の縁に、勘所ごとに
-  const dotMat = new THREE.MeshBasicMaterial({ color:'#fbb817' });
-  for(const n of [2, 4, 5, 7, 9]){
-    const d = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.6, 16), dotMat);
-    const x = fretX(n); d.position.set(x, halfW(x) + 0.2, -2.5); group.add(d);
+  // 勘所シール（練習用に棹の表に貼る目印）。色は本手で押さえる指の色
+  const STICK = [[2, 1], [4, 2], [5, 4], [7, 2], [9, 4]];
+  for(const [n, f] of STICK){
+    const x = fretX(n);
+    const strip = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2*halfW(x) - 2), new THREE.MeshBasicMaterial({ color: FINGER_COLORS[f], transparent: true, opacity: 0.85 }));
+    strip.position.set(x, 0, 0.06); group.add(strip);
   }
 
-  // 弦：上駒からウマまで。押さえた弦は、指のところで棹の表まで沈む
-  const strMat = new THREE.MeshStandardMaterial({ color:'#f4ead2', roughness:0.35, metalness:0.1, emissive:'#000000' });
+  // 弦：カラクイ → 上駒 →（押さえた所）→ ウマ → 棹の先（糸を掛ける所）
+  const strMat = new THREE.MeshStandardMaterial({ color:'#f4ead2', roughness:0.35, metalness:0.1 });
   const openMat = new THREE.MeshBasicMaterial({ color:'#5fe0ff' });
   const unit = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true);
-  const strings = [0,1,2].map(s => {
-    const a = new THREE.Mesh(unit, strMat), b = new THREE.Mesh(unit, strMat);
-    group.add(a, b);
-    return { a, b, s };
-  });
-  const place = (m, p, q, r) => {
+  const tieX = BODY_X0 + BODY_LEN + TAIL_LEN*0.4;
+  const place = (m, p, q, rr) => {
     const A = new THREE.Vector3(...p), B = new THREE.Vector3(...q);
     m.position.copy(A).add(B).multiplyScalar(0.5);
-    m.scale.set(r, A.distanceTo(B), r);
+    m.scale.set(rr, A.distanceTo(B), rr);
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), B.sub(A).normalize());
   };
+  const strings = [0,1,2].map(s => {
+    const seg = [0,1,2,3].map(() => new THREE.Mesh(unit, strMat));
+    seg.forEach(m => group.add(m));
+    const rr = STRING_R[s];
+    const nutP = [-1, strY(s, 0), stringZ(0)], umaP = [UMA_X, strY(s, UMA_X), stringZ(UMA_X)];
+    place(seg[2], pegAnchor[s], nutP, rr * 0.9);                                    // カラクイ → 上駒
+    place(seg[3], umaP, [tieX, strY(s, UMA_X)*0.35, -1.5], rr);                     // ウマ → 棹の先
+    return { seg, s, nutP, umaP, rr };
+  });
   // str：弦ごとの { contact: 押さえる位置x } または null（開放）。open：光らせる開放弦
   function setStrings(str, open = []){
-    strings.forEach(({a, b, s}) => {
-      const r = STRING_R[s];
-      const p0 = [-1, strY(s, 0), stringZ(0)], p1 = [UMA_X, strY(s, UMA_X), stringZ(UMA_X)];
+    strings.forEach(({ seg, s, nutP, umaP, rr }) => {
       const info = str && str[s];
       const mat = open.includes(s) ? openMat : strMat;
-      a.material = b.material = mat;
+      seg[0].material = seg[1].material = mat;
       if(info){
-        const x = info.contact, pc = [x, strY(s, x), r + 0.1];
-        place(a, p0, pc, r); place(b, pc, p1, r); b.visible = true;
-      } else { place(a, p0, p1, r); b.visible = false; }
+        const x = info.contact, pc = [x, strY(s, x), rr + 0.1];
+        place(seg[0], nutP, pc, rr); place(seg[1], pc, umaP, rr); seg[1].visible = true;
+      } else { place(seg[0], nutP, umaP, rr); seg[1].visible = false; }
     });
   }
   setStrings(null);

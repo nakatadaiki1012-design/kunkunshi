@@ -43,7 +43,7 @@ export const KANDOKORO: readonly Kandokoro[] = [
   { name: '四', yomi: 'し', str: 1, off: 0, finger: '開放' },
   { name: '上', yomi: 'じょう', str: 1, off: 2, finger: '人差指' },
   { name: '中', yomi: 'ちゅう', str: 1, off: 4, finger: '中指' },
-  { name: '尺', yomi: 'しゃく', str: 1, off: 5, finger: '人差指' },
+  { name: '尺', yomi: 'しゃく', str: 1, off: 5, finger: '小指' },
   { name: '工', yomi: 'こう', str: 2, off: 0, finger: '開放' },
   { name: '五', yomi: 'ご', str: 2, off: 2, finger: '人差指' },
   { name: '六', yomi: 'ろく', str: 2, off: 4, finger: '中指' },

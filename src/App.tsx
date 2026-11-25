@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import {
   KunkunshiScore,
@@ -32,6 +32,7 @@ import { createTinsaguScore } from './data/presetScores';
 import { sanshinSynth } from './audio/sanshinSynth';
 import { ScorePlayer, PlayerSettings, previewSlot as previewSlotAudio } from './audio/player';
 import { slotOffsetInBeat, resolveSlot } from './audio/timeline';
+import { choosePosition } from './hand3d/chord.js';
 import { Header } from './components/Header';
 import { Dock } from './components/Dock';
 import { MeasureNavigator } from './components/MeasureNavigator';
@@ -1552,6 +1553,31 @@ export default function App() {
     else if (!currentPlayKey) handSlotRef.current = sl;
     return handSlotRef.current;
   })();
+  // 手の位置：前後3つの音の中に 八・九 があれば尺位（人差指を下老・尺・七まで上げる）、なければ本手
+  const handKeyRef = useRef<string | null>(null);
+  {
+    const k = currentPlayKey || (ornTargetPos ? `${ornTargetPos.m}-${ornTargetPos.b}-${ornTargetPos.s}` : `${cursor.m}-${cursor.b}-${cursor.s}`);
+    if (handSlotRef.current === handSlot && handSlot && (handSlot.notes.length || !currentPlayKey)) handKeyRef.current = k;
+  }
+  const handPosition = useMemo<'low' | 'shaku'>(() => {
+    const key = handKeyRef.current;
+    if (!key) return 'low';
+    const flat: number[][] = [];
+    let at = -1;
+    score.measures.forEach((ms, m) =>
+      ms.beats.forEach((bt, b) =>
+        bt.slots.forEach((_, s) => {
+          const sl = resolveSlot(score, m, b, s);
+          if (`${m}-${b}-${s}` === key) at = flat.length;
+          if (sl && sl.notes.length) flat.push(sl.notes);
+          else if (`${m}-${b}-${s}` === key) flat.push([]);
+        })
+      )
+    );
+    if (at < 0) return 'low';
+    return choosePosition(flat.slice(Math.max(0, at - 3), at + 4));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [score.measures, handKeyRef.current]);
   const stringNamesNow = getStringNames();
   const ornTarget = ornTargetSlot
     ? {
@@ -1745,6 +1771,8 @@ export default function App() {
               activeStrings={handSlot?.notes || []}
               activeOshi={handSlot?.oshi || 0}
               playing={isPlaying}
+              handPosition={handPosition}
+              activeFinger={handSlot?.finger}
               onClose={() => mutateScore(d => (d.view.showSanshinBoard = false), { history: false })}
             />
           </div>

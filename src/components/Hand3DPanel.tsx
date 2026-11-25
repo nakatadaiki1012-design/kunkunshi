@@ -8,10 +8,10 @@ import { Eye, Loader2 } from 'lucide-react';
 import { POSITION_COUNT } from '../types/kunkunshi';
 
 type HandApi = {
-  show: (notes: number[], oshi?: number, opts?: { instant?: boolean; duration?: number }) => void;
+  show: (notes: number[], oshi?: number, opts?: { instant?: boolean; duration?: number; position?: string; finger?: number }) => void;
   setView: (name: string) => void;
   setGhost: (on: boolean) => void;
-  prepare: (list: { notes: number[]; oshi?: number }[]) => void;
+  prepare: (list: { notes: number[]; oshi?: number; position?: string }[]) => void;
   dispose: () => void;
   label: { text: string; sub: string };
 };
@@ -30,13 +30,17 @@ interface Hand3DPanelProps {
   oshi: number;
   /** 演奏中は、手を早めに動かす */
   playing?: boolean;
+  /** 手の位置：'low'（本手）／'shaku'（尺位） */
+  position?: 'low' | 'shaku';
+  /** マスに書いた指番号（1=人差指 2=中指 3=小指） */
+  finger?: number;
 }
 
 /**
  * 三線の棹を押さえる左手の3D。ウクレレ・ギターのハンドガイドと同じ「骨の入った手のモデル」を、
  * 関節の角度を計算して動かす。three.js は大きいので、この部品を開いた時だけ読み込む。
  */
-const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing }) => {
+const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing, position = 'low', finger }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<HandApi | null>(null);
@@ -44,8 +48,8 @@ const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing }) => {
   const [view, setView] = useState('diag');
   const [ghost, setGhost] = useState(false);
   const [label, setLabel] = useState({ text: '', sub: '' });
-  const latest = useRef({ notes, oshi });
-  latest.current = { notes, oshi };
+  const latest = useRef({ notes, oshi, position, finger });
+  latest.current = { notes, oshi, position, finger };
 
   useEffect(() => {
     let disposed = false;
@@ -59,10 +63,13 @@ const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing }) => {
           return;
         }
         apiRef.current = api;
-        api.show(latest.current.notes, latest.current.oshi, { instant: true });
+        api.show(latest.current.notes, latest.current.oshi, { instant: true, position: latest.current.position, finger: latest.current.finger });
         setLabel({ ...api.label });
         // 14の勘所の形を、ひまな時に先に計算しておく
-        api.prepare(Array.from({ length: POSITION_COUNT }, (_, i) => ({ notes: [i] })));
+        api.prepare([
+          ...Array.from({ length: POSITION_COUNT }, (_, i) => ({ notes: [i], position: 'low' })),
+          ...Array.from({ length: POSITION_COUNT }, (_, i) => ({ notes: [i], position: 'shaku' }))
+        ]);
         setStatus('ready');
       } catch (e) {
         console.error(e);
@@ -76,11 +83,11 @@ const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing }) => {
     };
   }, []);
 
-  const key = notes.join(',') + ':' + oshi;
+  const key = notes.join(',') + ':' + oshi + ':' + position + ':' + (finger || 0);
   useEffect(() => {
     const api = apiRef.current;
     if (!api) return;
-    api.show(notes, oshi, { duration: playing ? 140 : 260 });
+    api.show(notes, oshi, { duration: playing ? 140 : 260, position, finger });
     setLabel({ ...api.label });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -138,7 +145,8 @@ const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing }) => {
         )}
       </div>
       <p className="text-[10px] text-stone-400">
-        ドラッグで回す・2本指（右ドラッグ）で移動・ピンチ（ホイール）で拡大。棹の黄色い点は勘所の目安です。
+        ドラッグで回す・2本指（右ドラッグ）で移動・ピンチ（ホイール）で拡大。棹の表の色の線は勘所シール（本手で押さえる指の色）です。
+        八・九が近くにある所は、人差指を尺位（下老・尺・七）まで上げた押さえ方になります。
         手の3Dモデル：WebXR Input Profiles（MIT License）。
       </p>
     </div>

@@ -29,3 +29,16 @@ test('合わせで同じ指が重なる時は、別の指に替える（上＋�
   assert.deepEqual(c.frets, [0, 2, 2]);
   assert.notEqual(c.fingers[1], c.fingers[2]);
 });
+
+test('本手では 尺・七・下老 は小指、尺位では人差指', async () => {
+  const { choosePosition } = await import('./chord.js');
+  assert.deepEqual(chordFromNotes([pos('七')]).fingers, [0, 0, 4]);
+  assert.deepEqual(chordFromNotes([pos('尺')], 0, { position: 'shaku' }).fingers, [0, 1, 0]);
+  assert.deepEqual(chordFromNotes([pos('八')], 0, { position: 'shaku' }).fingers, [0, 0, 2]);
+  assert.equal(choosePosition([[pos('七')], [pos('八')]]), 'shaku');
+  assert.equal(choosePosition([[pos('上')], [pos('七')]]), 'low');
+});
+
+test('マスに書いた指番号（3＝小指）があれば、それに従う', () => {
+  assert.deepEqual(chordFromNotes([pos('上')], 0, { finger: 3 }).fingers, [0, 4, 0]);
+});

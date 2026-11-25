@@ -18,7 +18,7 @@ export { chordFromNotes, FINGER_COLORS, FINGER_NAMES };
 
 /* 三線は横に構える：空（上）は -y（男弦の側）、棹の表（客席）は +z、胴は +x */
 export const VIEWS = {
-  diag:  { label: 'ななめ', el: 26, az: 34, dist: 640 },
+  diag:  { label: 'ななめ', el: 24, az: 30, dist: 760 },
   self:  { label: '自分目線', el: 60, az: 8, dist: 660 },
   front: { label: '正面', el: 6, az: 4, dist: 720 },
   side:  { label: '横から', el: 16, az: -62, dist: 560 },
@@ -123,6 +123,8 @@ export async function createSanshinHand({ canvas, overlay }){
   controls.addEventListener('change', () => kick());
   function setView(name){
     viewName = VIEWS[name] ? name : 'diag';
+    // 見る中心：手のあたりと胴の間（胴が画面に入るように少し胴寄り）
+    target.set(Math.min(Math.max((cur?.target?.[0] ?? 130) + 70, 150), 300), 6, -10);
     const v = VIEWS[viewName], narrow = canvas.clientWidth < 520;
     const d = v.dist * (narrow ? 1.25 : 1), el = v.el * DEG, az = v.az * DEG;
     camera.up.set(...UP);
@@ -137,7 +139,7 @@ export async function createSanshinHand({ canvas, overlay }){
   function poseFor(chord){ return computePose(chord, rig); }
 
   function show(notes, oshi = 0, opts = {}){
-    const chord = chordFromNotes(notes, oshi);
+    const chord = chordFromNotes(notes, oshi, { position: opts.position, finger: opts.finger });
     chordNow = chord;
     const p = poseFor(chord);
     from = cur; to = p; t0 = performance.now(); dur = opts.instant ? 1 : (opts.duration || 220);
@@ -149,7 +151,7 @@ export async function createSanshinHand({ canvas, overlay }){
         const k = KANDOKORO[n]; if(!k) return '';
         const f = chord.fingers[k.str];
         return `${STRING_NAMES[k.str]}・${f ? FINGER_NAMES[f] : '開放（押さえない）'}`;
-      }).join(' ／ ')
+      }).join(' ／ ') + (chord.frets.some(v => v > 0) ? (chord.position === 'shaku' ? '（尺位）' : '（本手）') : '')
     };
     kick();
   }
@@ -197,7 +199,7 @@ export async function createSanshinHand({ canvas, overlay }){
       const at = (p, cls, txt, style = '') => { const q = project(p, w, h); if(q && q[0] > -40 && q[0] < w + 40 && q[1] > -40 && q[1] < h + 40) html += `<div class="${cls}" style="left:${q[0].toFixed(1)}px;top:${q[1].toFixed(1)}px;${style}">${txt}</div>`; };
       for(let s = 0; s < 3; s++) at([-14, strY(s, 0), stringZ(0) + 3], 'h3d-lab', STRING_NAMES[s].slice(0, 1));
       // 勘所の目印の名前（棹の床側の縁）
-      [[2,'乙 上 五'],[4,'老 中 六'],[5,'下老 尺 七'],[7,'八'],[9,'九']].forEach(([n, t], i) => at([fretX(n), halfW(fretX(n)) + (i % 2 ? 24 : 10), -3], 'h3d-pos', t));   // 近い勘所の名前が重ならないよう、互い違いに
+      [[2,'乙 上 五'],[4,'老 中 六'],[5,'下老 尺 七'],[7,'八'],[9,'九']].forEach(([n, t], i) => at([fretX(n), halfW(fretX(n)) + (i % 2 ? 26 : 11), -3], 'h3d-pos', t));   // 勘所シールの名前。近い勘所が重ならないよう、互い違いに
       if(!moving) for(let f = 1; f <= 4; f++){
         const F = cur.fingers[f]; if(!F || F.mode === 'hover') continue;
         at(F.pts[3], 'h3d-badge', FINGER_NAMES[f].slice(0, 1), `background:${FINGER_COLORS[f]}`);
@@ -214,7 +216,7 @@ export async function createSanshinHand({ canvas, overlay }){
     ric(() => { if(!alive || !queue.length) return; poseFor(queue.shift()); if(queue.length) idleWork(); });
   }
   function prepare(list){
-    for(const { notes, oshi } of list) queue.push(chordFromNotes(notes, oshi || 0));
+    for(const { notes, oshi, position } of list) queue.push(chordFromNotes(notes, oshi || 0, { position }));
     idleWork();
   }
 
