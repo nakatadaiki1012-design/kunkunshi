@@ -8,7 +8,8 @@ import { Eye, Loader2 } from 'lucide-react';
 import { POSITION_COUNT } from '../types/kunkunshi';
 
 type HandApi = {
-  show: (notes: number[], oshi?: number, opts?: { instant?: boolean; duration?: number; position?: string; finger?: number }) => void;
+  show: (notes: number[], oshi?: number, opts?: { instant?: boolean; duration?: number; position?: string; finger?: number; pluck?: boolean }) => void;
+  setRight: (on: boolean) => void;
   setView: (name: string) => void;
   setGhost: (on: boolean) => void;
   prepare: (list: { notes: number[]; oshi?: number; position?: string }[]) => void;
@@ -17,10 +18,12 @@ type HandApi = {
 };
 
 const VIEW_BUTTONS: [string, string][] = [
+  ['front', '正面'],
   ['diag', 'ななめ'],
   ['self', '自分目線'],
-  ['front', '正面'],
-  ['side', '横から']
+  ['side', '横から'],
+  ['left', '左手'],
+  ['right', '右手']
 ];
 
 interface Hand3DPanelProps {
@@ -34,19 +37,22 @@ interface Hand3DPanelProps {
   position?: 'low' | 'shaku';
   /** マスに書いた指番号（1=人差指 2=中指 3=小指） */
   finger?: number;
+  /** 音が出るたびに変わる値（同じ音をもう一度入れた時も、右手で弾くため） */
+  noteEvent?: string;
 }
 
 /**
  * 三線の棹を押さえる左手の3D。ウクレレ・ギターのハンドガイドと同じ「骨の入った手のモデル」を、
  * 関節の角度を計算して動かす。three.js は大きいので、この部品を開いた時だけ読み込む。
  */
-const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing, position = 'low', finger }) => {
+const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing, position = 'low', finger, noteEvent }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<HandApi | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [view, setView] = useState('diag');
+  const [view, setView] = useState('front');
   const [ghost, setGhost] = useState(false);
+  const [right, setRight] = useState(true);
   const [label, setLabel] = useState({ text: '', sub: '' });
   const latest = useRef({ notes, oshi, position, finger });
   latest.current = { notes, oshi, position, finger };
@@ -83,11 +89,11 @@ const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing, positio
     };
   }, []);
 
-  const key = notes.join(',') + ':' + oshi + ':' + position + ':' + (finger || 0);
+  const key = notes.join(',') + ':' + oshi + ':' + position + ':' + (finger || 0) + ':' + (noteEvent || '');
   useEffect(() => {
     const api = apiRef.current;
     if (!api) return;
-    api.show(notes, oshi, { duration: playing ? 140 : 260, position, finger });
+    api.show(notes, oshi, { duration: playing ? 140 : 260, position, finger, pluck: true });
     setLabel({ ...api.label });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -126,10 +132,22 @@ const Hand3DPanel: React.FC<Hand3DPanelProps> = ({ notes, oshi, playing, positio
           >
             <Eye className="h-3 w-3" /> 半透明
           </button>
+          <button
+            onClick={() => {
+              setRight(r => !r);
+              apiRef.current?.setRight(!right);
+            }}
+            className={`rounded px-2 py-0.5 text-[11px] font-bold cursor-pointer border ${
+              right ? 'bg-amber-400 text-stone-950 border-amber-300' : 'bg-stone-900 text-amber-100 border-stone-700 hover:border-amber-500'
+            }`}
+            title="爪をはめた右手を表示する（音を入れたり再生したりすると、その弦を弾きます）"
+          >
+            右手（爪）
+          </button>
         </div>
       </div>
 
-      <div className="relative w-full overflow-hidden rounded-lg border border-stone-700" style={{ height: 'min(52vh, 420px)' }}>
+      <div className="relative w-full overflow-hidden rounded-lg border border-stone-700" style={{ height: 'min(64vh, 560px)' }}>
         <canvas ref={canvasRef} className="block h-full w-full touch-none" />
         <div ref={overlayRef} className="h3d-overlay pointer-events-none absolute inset-0" />
         {status !== 'ready' && (

@@ -33,6 +33,8 @@ interface VirtualSanshinProps {
   handPosition?: 'low' | 'shaku';
   /** マスに書いた指番号 */
   activeFinger?: number;
+  /** 音が出るたびに変わる値 */
+  noteEvent?: string;
   onClose?: () => void;
 }
 
@@ -43,7 +45,7 @@ const xOf = (off: number) => (off === 0 ? 4 : 4 + (1 - Math.pow(2, -off / 12)) *
  * 仮想三線：棹（さお）を横に寝かせた図。上から 女弦・中弦・男弦。
  * 勘所を押すと音が鳴って譜面に入る。再生中は鳴っている弦が光る。
  */
-export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectString, activeStrings = [], activeOshi = 0, playing = false, handPosition = 'low', activeFinger, onClose }) => {
+export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectString, activeStrings = [], activeOshi = 0, playing = false, handPosition = 'low', activeFinger, noteEvent, onClose }) => {
   const pitches = getPitches(score);
   const open = getOpenStrings(score);
   const [vibrating, setVibrating] = useState<Record<number, boolean>>({});
@@ -122,7 +124,7 @@ export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({ score, onSelectS
 
       {!isCollapsed && mode === 'hand' && (
         <Suspense fallback={<div className="py-10 text-center text-sm text-amber-100">3Dの手を読み込んでいます…</div>}>
-          <Hand3DPanel notes={activeStrings} oshi={activeOshi} playing={playing} position={handPosition} finger={activeFinger} />
+          <Hand3DPanel notes={activeStrings} oshi={activeOshi} playing={playing} position={handPosition} finger={activeFinger} noteEvent={noteEvent} />
         </Suspense>
       )}
 

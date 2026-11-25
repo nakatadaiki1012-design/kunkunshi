@@ -1773,6 +1773,7 @@ export default function App() {
               playing={isPlaying}
               handPosition={handPosition}
               activeFinger={handSlot?.finger}
+              noteEvent={currentPlayKey || (lastEnteredSlot ? `${lastEnteredSlot.m}-${lastEnteredSlot.b}-${lastEnteredSlot.s}:${historyVersion}` : '')}
               onClose={() => mutateScore(d => (d.view.showSanshinBoard = false), { history: false })}
             />
           </div>
