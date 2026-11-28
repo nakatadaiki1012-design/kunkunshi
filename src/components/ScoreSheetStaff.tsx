@@ -163,7 +163,7 @@ export const ScoreSheetStaff: React.FC<ScoreSheetStaffProps> = ({
       }
       // 歌詞（拍ごと）
       score.measures[m].beats.forEach((bt, b) => {
-        if (!bt.lyrics) return;
+        if (!bt.lyrics || !score.view.showLyrics) return;
         const { x0 } = slotRange(m, b, 0, r, col);
         els.push(<text key={`ly${m}-${b}`} x={x0 + 4} y={STAFF_BOTTOM + 52} fontSize="11" className="font-score" fill="#3d3529">{bt.lyrics}</text>);
       });

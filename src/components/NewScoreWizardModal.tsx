@@ -24,7 +24,8 @@ import {
   AlignVerticalSpaceAround,
   AlignHorizontalSpaceAround,
   X,
-  Check
+  Check,
+  Music4
 } from 'lucide-react';
 
 interface NewScoreWizardModalProps {
@@ -193,7 +194,7 @@ export const NewScoreWizardModal: React.FC<NewScoreWizardModalProps> = ({
           {/* 2. 楽譜の形 */}
           <div>
             <label className="block text-xs font-bold text-stone-800 mb-1">楽譜の形（あとから切り替えられます）</label>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 onClick={() => setLayout('vertical')}
@@ -223,6 +224,21 @@ export const NewScoreWizardModal: React.FC<NewScoreWizardModalProps> = ({
                   タブ譜
                 </span>
                 <span className="text-[10px] font-normal text-stone-500">3本の線（女弦・中弦・男弦）</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayout('staff')}
+                className={`flex flex-col items-center justify-center gap-0.5 p-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  layout === 'staff'
+                    ? 'border-indigo-600 bg-indigo-50/80 text-indigo-950 ring-1 ring-indigo-600'
+                    : 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'
+                }`}
+              >
+                <span className="flex items-center gap-1">
+                  <Music4 className="h-3.5 w-3.5" />
+                  五線譜
+                </span>
+                <span className="text-[10px] font-normal text-stone-500">ト音記号・下に工工四</span>
               </button>
             </div>
           </div>

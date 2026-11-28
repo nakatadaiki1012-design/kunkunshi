@@ -15,7 +15,9 @@ import {
   RightHandOrn,
   getPitches,
   noteName,
-  InputDivType
+  InputDivType,
+  TEMPO_MIN,
+  TEMPO_MAX
 } from '../types/kunkunshi';
 import {
   Play,
@@ -177,6 +179,7 @@ export const Dock: React.FC<DockProps> = ({
   // Tap tempo helper
   const tapTimes = useRef<number[]>([]);
   const [tapBadge, setTapBadge] = useState<string | null>(null);
+  const tapBadgeTimer = useRef<number | undefined>(undefined);
 
   const handleTapTempo = () => {
     const now = performance.now();
@@ -184,6 +187,8 @@ export const Dock: React.FC<DockProps> = ({
     if (times.length && now - times[times.length - 1] > 2000) {
       tapTimes.current = [now];
       setTapBadge('タップ開始');
+      clearTimeout(tapBadgeTimer.current);
+      tapBadgeTimer.current = window.setTimeout(() => setTapBadge(null), 2500);
       return;
     }
     times.push(now);
@@ -196,13 +201,16 @@ export const Dock: React.FC<DockProps> = ({
       }
       const avgMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
       const bpm = Math.round(60000 / avgMs);
-      if (bpm >= 30 && bpm <= 240) {
+      if (bpm >= TEMPO_MIN && bpm <= TEMPO_MAX) {
         onTempoChange(bpm);
         setTapBadge(`BPM ${bpm}`);
-        setTimeout(() => setTapBadge(null), 1500);
+        clearTimeout(tapBadgeTimer.current);
+        tapBadgeTimer.current = window.setTimeout(() => setTapBadge(null), 1500);
       }
     } else {
       setTapBadge('もう一度');
+      clearTimeout(tapBadgeTimer.current);
+      tapBadgeTimer.current = window.setTimeout(() => setTapBadge(null), 2500);
     }
   };
 
@@ -702,6 +710,20 @@ export const Dock: React.FC<DockProps> = ({
                     <option value="1.25">125%</option>
                   </select>
                 </div>
+
+                <label className="flex items-center gap-1" title="三線の音の大きさ">
+                  <span className="text-stone-500">音量:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={volume}
+                    onChange={e => onSetVolume(Number(e.target.value))}
+                    className="w-20 accent-indigo-600 cursor-pointer"
+                    aria-label="音量"
+                  />
+                </label>
 
                 <label className="flex items-center gap-1 cursor-pointer">
                   <input

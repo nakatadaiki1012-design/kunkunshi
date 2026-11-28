@@ -22,7 +22,9 @@ import {
   NOTE_CDE,
   NOTE_DOREMI,
   getTuningLabel,
-  noteName
+  noteName,
+  TEMPO_MIN,
+  TEMPO_MAX
 } from '../types/kunkunshi';
 import { Plus, Play, Repeat, Trash2, Copy, Edit2, Check, X, MoreVertical } from 'lucide-react';
 
@@ -43,7 +45,8 @@ interface ScoreSheetVerticalProps {
   onDuplicateMeasure?: (mIdx: number) => void;
   onDeleteMeasure?: (mIdx: number) => void;
   onAddMeasure?: () => void;
-  onSetLoop?: (active: boolean, a?: number, b?: number) => void;
+  /** a・b のどちらかが null なら、そちらの端は今のまま */
+  onSetLoop?: (active: boolean, a?: number | null, b?: number | null) => void;
   autoScroll?: boolean;
 }
 
@@ -90,7 +93,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
     if (!onUpdateScoreMeta || !editingField) return;
     if (editingField === 'tempo') {
       const num = parseInt(editVal, 10);
-      if (!isNaN(num) && num >= 30 && num <= 240) {
+      if (!isNaN(num) && num >= TEMPO_MIN && num <= TEMPO_MAX) {
         onUpdateScoreMeta({ tempo: num });
       }
     } else {
@@ -334,8 +337,10 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
         <div key={colIdx} className="score-column flex flex-col shrink-0">
           {/* Column Header showing Measure Range */}
           <div className="h-5 px-1 font-sans text-[11px] text-stone-500 tabular-nums font-semibold flex items-center justify-between border-b border-stone-300">
-            <span>{col.measures[0] + 1}〜{col.measures[col.measures.length - 1] + 1}</span>
-            <span className="text-[9px] text-stone-400">段</span>
+            <span>
+              {col.measures.length > 1 ? `${col.measures[0] + 1}〜${col.measures[col.measures.length - 1] + 1}` : col.measures[0] + 1}
+            </span>
+            <span className="text-[9px] text-stone-400">小節</span>
           </div>
 
           {/* Column Body containing Measures */}
@@ -407,7 +412,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                         <>
                           <button
                             onClick={() => {
-                              onSetLoop(true, mIdx + 1, score.measures.length);
+                              onSetLoop(true, mIdx + 1, null);
                               setActiveMenuMeasure(null);
                             }}
                             className="flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 rounded text-left cursor-pointer"
@@ -416,7 +421,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                           </button>
                           <button
                             onClick={() => {
-                              onSetLoop(true, 1, mIdx + 1);
+                              onSetLoop(true, null, mIdx + 1);
                               setActiveMenuMeasure(null);
                             }}
                             className="flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 rounded text-left cursor-pointer"
@@ -644,58 +649,6 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
                                 );
                               })}
                             </div>
-                          ) : score.view.sixteenthLayout === 'grid' ? (
-                            /* 16th notes (♬) - 2x2 Grid Layout */
-                            <div className="flex flex-col h-full divide-y divide-stone-300">
-                              <div className="flex flex-1 divide-x divide-stone-300">
-                                {[0, 1].map(sIdx => {
-                                  const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
-                                  const isMultiSel = selectedSlotKeys?.has(slotKey);
-                                  return (
-                                    <div
-                                      key={sIdx}
-                                      id={`slot-${mIdx}-${bIdx}-${sIdx}`}
-                                      onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, sIdx, e)}
-                                      onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, sIdx)}
-                                      onClick={e => onSlotClick(mIdx, bIdx, sIdx, false, e.shiftKey, e.ctrlKey || e.metaKey)}
-                                      className={`relative flex flex-1 flex-col items-center justify-center cursor-pointer transition-colors ${
-                                        isMultiSel
-                                          ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
-                                          : cursor.m === mIdx && cursor.b === bIdx && cursor.s === sIdx
-                                          ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
-                                          : ''
-                                      } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
-                                    >
-                                      {renderSlotContent(beat.slots[sIdx], isArabic, isRubyOn, renderRuby, true, undefined, stringNames)}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div className="flex flex-1 divide-x divide-stone-400">
-                                {[2, 3].map(sIdx => {
-                                  const slotKey = `${mIdx}-${bIdx}-${sIdx}`;
-                                  const isMultiSel = selectedSlotKeys?.has(slotKey);
-                                  return (
-                                    <div
-                                      key={sIdx}
-                                      id={`slot-${mIdx}-${bIdx}-${sIdx}`}
-                                      onMouseDown={e => onSlotMouseDown?.(mIdx, bIdx, sIdx, e)}
-                                      onMouseEnter={() => onSlotMouseEnter?.(mIdx, bIdx, sIdx)}
-                                      onClick={e => onSlotClick(mIdx, bIdx, sIdx, false, e.shiftKey, e.ctrlKey || e.metaKey)}
-                                      className={`relative flex flex-1 flex-col items-center justify-center cursor-pointer transition-colors ${
-                                        isMultiSel
-                                          ? 'bg-amber-200/90 ring-2 ring-amber-600 ring-inset'
-                                          : cursor.m === mIdx && cursor.b === bIdx && cursor.s === sIdx
-                                          ? 'bg-indigo-100 ring-2 ring-indigo-600 ring-inset'
-                                          : ''
-                                      } ${currentPlayKey === `${mIdx}-${bIdx}-${sIdx}` ? 'bg-amber-300/80 ring-2 ring-amber-500' : 'hover:bg-amber-50/50'}`}
-                                    >
-                                      {renderSlotContent(beat.slots[sIdx], isArabic, isRubyOn, renderRuby, true, undefined, stringNames)}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
                           ) : (
                             /* 16th notes (♬) - Vertical 4-Stack Layout (縦4段：8分音符より縦に半分小さく表示) */
                             <div className="flex flex-col h-full divide-y divide-stone-300">
@@ -864,7 +817,7 @@ function renderSlotContent(
           {lh && (
             <span
               className={`${aloneTextSize} font-bold text-red-700 font-score leading-none tracking-tight`}
-              title="押手・左手技法"
+              title="♯・♭と左手の奏法"
             >
               {lh}
             </span>
@@ -987,7 +940,7 @@ function renderSlotContent(
           {lh && (
             <span
               className={`${lhTextSize} shrink-0 font-bold text-red-700 font-score tracking-tighter mr-0.5 select-none`}
-              title="押手・左手技法"
+              title="♯・♭と左手の奏法"
             >
               {lh}
             </span>

@@ -134,29 +134,23 @@ export const MeasureNavigator: React.FC<MeasureNavigatorProps> = ({
 
         {/* Column per Line toggle */}
         <div className="hidden sm:flex items-center gap-0.5 border-l border-stone-200 pl-1">
-          <button
-            onClick={() => onSetPerLine(2)}
-            className={`h-5 rounded px-1 text-[10px] font-semibold transition-colors cursor-pointer ${
-              perLine === 2 ? 'bg-indigo-100 text-indigo-900 font-bold' : 'text-stone-500 hover:bg-stone-100'
-            }`}
-            title="2小節/段（スマホに最適）"
-          >
-            2小節
-          </button>
-          <button
-            onClick={() => onSetPerLine(4)}
-            className={`h-5 rounded px-1 text-[10px] font-semibold transition-colors cursor-pointer ${
-              perLine === 4 ? 'bg-indigo-100 text-indigo-900 font-bold' : 'text-stone-500 hover:bg-stone-100'
-            }`}
-            title="4小節/段（標準表示）"
-          >
-            4小節
-          </button>
+          {[2, 3, 4].map(n => (
+            <button
+              key={n}
+              onClick={() => onSetPerLine(n)}
+              className={`h-5 rounded px-1 text-[10px] font-semibold transition-colors cursor-pointer ${
+                perLine === n ? 'bg-indigo-100 text-indigo-900 font-bold' : 'text-stone-500 hover:bg-stone-100'
+              }`}
+              title={`1${layout === 'vertical' ? '列' : '行'}に${n}小節`}
+            >
+              {n}小節
+            </button>
+          ))}
         </div>
 
         <div
           className="text-[10px] font-mono text-stone-500 font-semibold cursor-help px-0.5"
-          title="💡 操作ヒント: 画面を左右スワイプで小節移動 / ダブルタップで全体表示切替 / ピンチで拡大縮小"
+          title="💡 操作ヒント: ダブルタップで全体表示切替 / ピンチで拡大縮小"
         >
           {Math.round(zoom * 100)}%
         </div>

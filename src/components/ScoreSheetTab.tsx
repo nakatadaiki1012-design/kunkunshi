@@ -44,7 +44,8 @@ interface ScoreSheetTabProps {
   onDuplicateMeasure?: (mIdx: number) => void;
   onDeleteMeasure?: (mIdx: number) => void;
   onAddMeasure?: () => void;
-  onSetLoop?: (active: boolean, a?: number, b?: number) => void;
+  /** a・b のどちらかが null なら、そちらの端は今のまま */
+  onSetLoop?: (active: boolean, a?: number | null, b?: number | null) => void;
   autoScroll?: boolean;
 }
 
@@ -375,7 +376,7 @@ export const ScoreSheetTab: React.FC<ScoreSheetTabProps> = ({
                           <>
                             <button
                               onClick={() => {
-                                onSetLoop(true, mIdx + 1, score.measures.length);
+                                onSetLoop(true, mIdx + 1, null);
                                 setActiveMenuMeasure(null);
                               }}
                               className="flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 rounded text-left cursor-pointer"
@@ -384,7 +385,7 @@ export const ScoreSheetTab: React.FC<ScoreSheetTabProps> = ({
                             </button>
                             <button
                               onClick={() => {
-                                onSetLoop(true, 1, mIdx + 1);
+                                onSetLoop(true, null, mIdx + 1);
                                 setActiveMenuMeasure(null);
                               }}
                               className="flex items-center gap-1.5 px-2 py-1 hover:bg-stone-100 rounded text-left cursor-pointer"

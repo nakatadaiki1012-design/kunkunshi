@@ -63,7 +63,7 @@ export const TuningModal: React.FC<TuningModalProps> = ({
   const handleRootChange = (newRoot: number) => {
     onUpdateTuning({
       ...currentTuning,
-      root: clamp(newRoot, 36, 64)
+      root: clamp(newRoot, 45, 56)
     });
   };
 
@@ -76,7 +76,7 @@ export const TuningModal: React.FC<TuningModalProps> = ({
     } else {
       onUpdateTuning({
         ...currentTuning,
-        root: clamp(currentTuning.root + delta, 36, 64)
+        root: clamp(currentTuning.root + delta, 45, 56)
       });
     }
   };

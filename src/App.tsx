@@ -14,6 +14,7 @@ import {
   KANDOKORO,
   createNewSlot,
   createNewBeat,
+  Beat,
   createNewMeasure,
   createEmptyScore,
   normalizeScore,
@@ -26,7 +27,9 @@ import {
   RightHandOrn,
   LEFT_HAND_ORNS,
   RIGHT_HAND_ORNS,
-  InputDivType
+  InputDivType,
+  ZOOM_MIN,
+  ZOOM_MAX
 } from './types/kunkunshi';
 import { createTinsaguScore } from './data/presetScores';
 import { sanshinSynth } from './audio/sanshinSynth';
@@ -108,6 +111,8 @@ const NO_KEYS = new Set<string>();
 export interface CopiedSlotItem {
   slot: Slot;
   sourceDiv: 1 | 2 | 3 | 4;
+  /** ♪♬・♬♪ の拍から写したときの分け方 */
+  sourceSubDiv?: Beat['subDiv'];
 }
 
 export default function App() {
@@ -464,7 +469,7 @@ export default function App() {
       const t2 = e.touches[1];
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       const ratio = dist / (touchStateRef.current.initialDistance || 1);
-      const newZoom = clamp(Math.round(touchStateRef.current.initialZoom * ratio * 100) / 100, 0.45, 1.5);
+      const newZoom = clamp(Math.round(touchStateRef.current.initialZoom * ratio * 100) / 100, ZOOM_MIN, ZOOM_MAX);
       mutateScore(
         d => {
           d.view.zoom = newZoom;
@@ -480,48 +485,21 @@ export default function App() {
       return;
     }
 
-    if (e.changedTouches.length === 1) {
-      const touch = e.changedTouches[0];
-      const deltaX = touch.clientX - touchStateRef.current.startX;
-      const deltaY = touch.clientY - touchStateRef.current.startY;
-      const elapsed = performance.now() - touchStateRef.current.startTime;
-
-      // Horizontal swipe gesture detection
-      if (Math.abs(deltaX) > 55 && Math.abs(deltaY) < 45 && elapsed < 400) {
-        const v = score.view.layout === 'vertical';
-        const step = score.view.perLine || 2;
-        if (v) {
-          // Vertical layout: right to left reading
-          // Finger moves left (deltaX < 0) -> advance to later measures (to the left)
-          if (deltaX < 0) {
-            setCursor(prev => ({
-              ...prev,
-              m: Math.min(score.measures.length - 1, prev.m + step)
-            }));
-          } else {
-            // Finger moves right (deltaX > 0) -> retreat to earlier measures (to the right)
-            setCursor(prev => ({
-              ...prev,
-              m: Math.max(0, prev.m - step)
-            }));
-          }
-        } else {
-          // Horizontal layout
-          if (deltaX < 0) {
-            setCursor(prev => ({
-              ...prev,
-              m: Math.min(score.measures.length - 1, prev.m + step)
-            }));
-          } else {
-            setCursor(prev => ({
-              ...prev,
-              m: Math.max(0, prev.m - step)
-            }));
-          }
-        }
-      }
-    }
+    // 横にすべらせた時は楽譜のスクロールだけにする（カーソルは動かさない）
   };
+
+  // ループ範囲：片方だけ指定された時は、もう片方の端を残す（A が B より後ろなら、B を A にそろえる）
+  const setLoopRangeKeep = useCallback((a: number | null, b: number | null) => {
+    setLoopRange(prev => {
+      let na = a ?? prev[0];
+      let nb = b ?? prev[1];
+      if (na > nb) {
+        if (a != null) nb = na;
+        else na = nb;
+      }
+      return [na, nb];
+    });
+  }, []);
 
   // 再生エンジン（譜面・速さ・くり返し範囲が変わったら、再生中でも今の位置から反映する）
   const settingsRef = useRef<PlayerSettings>({ speed, countIn, metronome, loop: null });
@@ -794,7 +772,6 @@ export default function App() {
 
   const handleInputRest = useCallback(() => setSlotKind('rest'), [setSlotKind]);
   const handleInputTie = useCallback(() => setSlotKind('tie'), [setSlotKind]);
-  const handleInputRepeat2 = useCallback(() => setSlotKind('repeat2'), [setSlotKind]);
 
   const handleInputClear = useCallback(() => {
     mutateScore(draft => {
@@ -1092,7 +1069,8 @@ export default function App() {
         if (slot && beat) {
           copied.push({
             slot: JSON.parse(JSON.stringify(slot)),
-            sourceDiv: beat.div || 2
+            sourceDiv: beat.div || 2,
+            sourceSubDiv: beat.subDiv
           });
           if (slot.rest) textParts.push('○');
           else if (slot.tie) textParts.push('ー');
@@ -1125,7 +1103,8 @@ export default function App() {
     if (curSlot && curBeat) {
       slotClipboardRef.current = [{
         slot: JSON.parse(JSON.stringify(curSlot)),
-        sourceDiv: curBeat.div || 2
+        sourceDiv: curBeat.div || 2,
+        sourceSubDiv: curBeat.subDiv
       }];
       showToast('1マスをコピーしました (Ctrl+C)');
     }
@@ -1184,6 +1163,7 @@ export default function App() {
           if (beat.div < item.sourceDiv) {
             const oldSlots = beat.slots;
             beat.div = item.sourceDiv;
+            beat.subDiv = item.sourceSubDiv;
             beat.slots = Array.from({ length: item.sourceDiv }, (_, idx) => oldSlots[idx] || createNewSlot());
           }
 
@@ -1202,6 +1182,7 @@ export default function App() {
             if (beat && beat.div < item.sourceDiv) {
               const oldSlots = beat.slots;
               beat.div = item.sourceDiv;
+              beat.subDiv = item.sourceSubDiv;
               beat.slots = Array.from({ length: item.sourceDiv }, (_, idx) => oldSlots[idx] || createNewSlot());
             }
           }
@@ -1729,7 +1710,7 @@ export default function App() {
                 onAddMeasure={handleAddMeasure}
                 onSetLoop={(active, a, b) => {
                   setLoopActive(active);
-                  if (a != null && b != null) setLoopRange([a, b]);
+                  if (a != null || b != null) setLoopRangeKeep(a ?? null, b ?? null);
                 }}
                 autoScroll={true}
               />
@@ -1769,7 +1750,7 @@ export default function App() {
                 onAddMeasure={handleAddMeasure}
                 onSetLoop={(active, a, b) => {
                   setLoopActive(active);
-                  if (a != null && b != null) setLoopRange([a, b]);
+                  if (a != null || b != null) setLoopRangeKeep(a ?? null, b ?? null);
                 }}
                 autoScroll={true}
               />
@@ -1844,7 +1825,6 @@ export default function App() {
             onToggleChordMode={() => setIsChordMode(!isChordMode)}
             onInputRest={handleInputRest}
             onInputTie={handleInputTie}
-            onInputRepeat2={handleInputRepeat2}
             onInputClear={handleInputClear}
             onToggleOrn={handleToggleOrn}
             onAddMeasure={handleAddMeasure}
@@ -1934,11 +1914,14 @@ export default function App() {
         onOpenNewScoreWizard={() => setIsNewScoreWizardOpen(true)}
       />
 
+      {/* 開くたびに入力欄を最初の状態に戻す（閉じている間は作らない） */}
+      {isNewScoreWizardOpen && (
       <NewScoreWizardModal
         isOpen={isNewScoreWizardOpen}
         onClose={() => setIsNewScoreWizardOpen(false)}
         onCreateScore={handleCreateScoreFromWizard}
       />
+      )}
 
       <ExportModal
         score={score}

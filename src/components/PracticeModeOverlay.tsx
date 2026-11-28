@@ -108,14 +108,11 @@ export const PracticeModeOverlay: React.FC<PracticeModeOverlayProps> = ({
         onPlayToggle();
         return;
       }
-      if (e.key === 'ArrowLeft') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
-        onSelectMeasure(Math.max(0, cursor.m - 1));
-        return;
-      }
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        onSelectMeasure(Math.min(score.measures.length - 1, cursor.m + 1));
+        // 縦書きは右から左へ読むので、← が次の小節
+        const forward = (e.key === 'ArrowLeft') === (score.view.layout === 'vertical');
+        onSelectMeasure(forward ? Math.min(score.measures.length - 1, cursor.m + 1) : Math.max(0, cursor.m - 1));
         return;
       }
     };

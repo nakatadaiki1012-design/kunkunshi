@@ -154,6 +154,9 @@ export const ORN_LABELS: Record<string, { short: string; label: string; desc: st
   keshi: { short: '止', label: '消音', desc: '弾いたすぐあとに響きを止める', key: 'V' }
 };
 
+/** 拡大・縮小の範囲（ボタン・ピンチ・「全体」で共通） */
+export const ZOOM_MIN = 0.45;
+export const ZOOM_MAX = 1.5;
 export const TEMPO_MIN = 30;
 export const TEMPO_MAX = 260;
 
@@ -218,7 +221,6 @@ export interface ViewSettings {
   lyricsPosition?: 'right' | 'bottom'; // 歌詞の位置: 'right' (マスの右側に薄い列) | 'bottom' (マスの下)
   showSanshinBoard: boolean;
   zoom: number;
-  sixteenthLayout?: 'vertical' | 'grid';
   fontStyle?: 'shippori' | 'kaisei' | 'yuji' | 'klee' | 'noto';
   /** タブ譜で、線の上に工工四の文字の代わりに何を書くか */
   tabLabel?: 'kanji' | 'doremi';
@@ -378,8 +380,7 @@ export function normalizeScore(raw: any, fallback?: KunkunshiScore): KunkunshiSc
     showLyrics: v.showLyrics === undefined ? true : !!v.showLyrics,
     lyricsPosition: v.lyricsPosition === 'bottom' ? 'bottom' : 'right',
     showSanshinBoard: !!v.showSanshinBoard,
-    zoom: typeof v.zoom === 'number' && !isNaN(v.zoom) && v.zoom >= 0.3 ? clamp(v.zoom, 0.4, 2.0) : 1.0,
-    sixteenthLayout: v.sixteenthLayout === 'grid' ? 'grid' : 'vertical',
+    zoom: typeof v.zoom === 'number' && !isNaN(v.zoom) && v.zoom >= 0.3 ? clamp(v.zoom, ZOOM_MIN, ZOOM_MAX) : 1.0,
     fontStyle: ['shippori', 'kaisei', 'yuji', 'klee', 'noto'].includes(v.fontStyle) ? v.fontStyle : 'shippori',
     tabLabel: v.tabLabel === 'doremi' ? 'doremi' : 'kanji'
   };

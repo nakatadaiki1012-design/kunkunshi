@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { KunkunshiScore, getTuningLabel, TEMPO_MIN, TEMPO_MAX, TUNING_PRESETS, honOfRoot } from '../types/kunkunshi';
+import { KunkunshiScore, getTuningLabel, TEMPO_MIN, TEMPO_MAX, ZOOM_MIN, ZOOM_MAX, TUNING_PRESETS, honOfRoot } from '../types/kunkunshi';
 import {
   Music,
   Sliders,
@@ -57,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
   const view = score.view;
 
   const handleZoom = (delta: number) => {
-    const nextZoom = Math.min(1.5, Math.max(0.65, Math.round((view.zoom + delta) * 100) / 100));
+    const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((view.zoom + delta) * 100) / 100));
     onUpdateView({ zoom: nextZoom });
   };
 
@@ -311,7 +311,8 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
 
-              {/* Ruby */}
+              {/* Ruby（五線譜では使わない） */}
+              {view.layout !== 'staff' && (
               <div className="flex items-center gap-1">
                 <span className="text-[11px] font-semibold text-stone-400">ルビ:</span>
                 <select
@@ -324,10 +325,11 @@ export const Header: React.FC<HeaderProps> = ({
                   <option value="cde">CDE</option>
                 </select>
               </div>
+              )}
 
               {/* Measures per line */}
               <div className="flex items-center gap-1">
-                <span className="text-[11px] font-semibold text-stone-400">1段:</span>
+                <span className="text-[11px] font-semibold text-stone-400">{view.layout === 'vertical' ? '1列:' : '1行:'}</span>
                 <select
                   value={view.perLine}
                   onChange={e => onUpdateView({ perLine: Number(e.target.value) })}
@@ -355,7 +357,8 @@ export const Header: React.FC<HeaderProps> = ({
                 </select>
               </div>
 
-              {/* Tuning chart on the score */}
+              {/* Tuning chart on the score（五線譜では使わない） */}
+              {view.layout !== 'staff' && (
               <button
                 onClick={() => onUpdateView({ chart: view.chart === 'on' ? 'off' : 'on' })}
                 className={`rounded-md border px-2 py-0.5 text-xs font-semibold cursor-pointer transition-colors ${
@@ -367,8 +370,10 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 調弦表
               </button>
+              )}
 
-              {/* Font selection */}
+              {/* Font selection（五線譜では使わない） */}
+              {view.layout !== 'staff' && (
               <div className="flex items-center gap-1">
                 <span className="text-[11px] font-semibold text-stone-400">書体:</span>
                 <select
@@ -378,25 +383,13 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <option value="shippori">しっぽり明朝（工工四らしい）</option>
                   <option value="kaisei">解星デコール（優美）</option>
-                  <option value="yuji">游築・筆文字（古典風格）</option>
+                  <option value="yuji">佑字朴・筆文字（古典風）</option>
                   <option value="klee">クレー（教科書筆記）</option>
                   <option value="noto">Noto Serif（標準明朝）</option>
                 </select>
               </div>
+              )}
 
-              {/* 16th note layout (縦4段: 8分音符より縦に小さく表示 / 2x2分割) */}
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] font-semibold text-stone-400">16分:</span>
-                <select
-                  value={view.sixteenthLayout || 'vertical'}
-                  onChange={e => onUpdateView({ sixteenthLayout: e.target.value as any })}
-                  className="rounded-md border border-stone-300 bg-white px-1.5 py-0.5 text-xs font-medium text-stone-700 cursor-pointer"
-                  title="16分音符の配置方式"
-                >
-                  <option value="vertical">縦4段（8分より縦に小さい）</option>
-                  <option value="grid">2×2（横分割）</option>
-                </select>
-              </div>
             </div>
 
             {/* Right: 仮想三線, Lyrics, Zoom */}
@@ -427,7 +420,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <Type className="h-3 w-3" />
                   <span>歌詞</span>
                 </button>
-                {view.showLyrics && (
+                {view.showLyrics && view.layout === 'vertical' && (
                   <button
                     onClick={() =>
                       onUpdateView({
