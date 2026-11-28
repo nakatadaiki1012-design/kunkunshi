@@ -42,3 +42,19 @@ test('琉球音階の練習・さくらさくらのシは「尺♯」（シ♭�
     assert.ok(shaku.every(sl => noteName(p[7] + accidentalOf(sl), false) === 'B'), s.title);
   }
 });
+
+test('唐船ドーイ・谷茶前節：仮のリズム（2拍子・1拍に2音）で、元の工工四の音がすべて入る', async () => {
+  const { createToshinDoiScore, createTanchameScore } = await import('./presetScores');
+  const toshin = createToshinDoiScore();
+  assert.equal(toshin.beatsPerMeasure, 2);
+  assert.equal(noteCount(toshin), 33 + 109);
+  const tancha = createTanchameScore();
+  assert.equal(noteCount(tancha), 33 + 59 + 32);
+  for (const s of [toshin, tancha]) {
+    assert.ok(s.measures.every(m => m.beats.length === 2));
+    const lyr = s.measures.flatMap(m => m.beats.map(b => b.lyrics || '')).join('');
+    assert.ok(lyr.length > 10, s.title);
+  }
+  assert.match(toshin.measures.flatMap(m => m.beats.map(b => b.lyrics || '')).join(''), /とーしんどーい/);
+  assert.match(tancha.measures.flatMap(m => m.beats.map(b => b.lyrics || '')).join(''), /たんちゃめーぬはまに/);
+});

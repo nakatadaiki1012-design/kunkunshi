@@ -218,6 +218,108 @@ export function createAsadoyaScore(): KunkunshiScore {
   return s;
 }
 
+/**
+ * 音の順番だけが分かっている曲を、仮のリズム（2拍子・1拍に8分音符2つ）で小節にする。
+ * ・1文字＝8分音符1つ。空白で区切ったまとまりは、1小節（8分音符4つ）の切れ目まで最後の音を延ばす
+ * ・words（歌詞）は、その行の拍に均等に割り振る
+ */
+function eighthPhrasesToBars(phrases: { notes: string; words?: string }[]): { bars: string[]; lyrics: string[] } {
+  const beats: string[] = [];
+  const beatWords: string[] = [];
+  for (const ph of phrases) {
+    const start = beats.length;
+    const eighths: string[] = [];
+    for (const seg of ph.notes.trim().split(/\s+/)) {
+      for (let i = 0; i < seg.length; i++) {
+        if (seg.startsWith('下老', i)) {
+          eighths.push('下老');
+          i++;
+        } else eighths.push(seg[i]);
+      }
+      while (eighths.length % 4) eighths.push('-');
+    }
+    for (let i = 0; i < eighths.length; i += 2) {
+      const [a, b] = [eighths[i], eighths[i + 1]];
+      beats.push(a === '-' && b === '-' ? '-' : `${a}.${b}`);
+    }
+    // 歌詞を拍に割り振る（小さい字・ーは前の字とまとめる）
+    const morae = (ph.words || '').replace(/[\s（）()]/g, '').match(/.[ぁぃぅぇぉゃゅょゎァィゥェォャュョヮー]*/g) || [];
+    const n = beats.length - start;
+    for (let k = 0; k < n; k++) {
+      const a = Math.floor((k * morae.length) / n), z = Math.floor(((k + 1) * morae.length) / n);
+      beatWords.push(morae.slice(a, z).join('') || '_');
+    }
+  }
+  const bars: string[] = [];
+  const lyrics: string[] = [];
+  for (let i = 0; i < beats.length; i += 2) {
+    bars.push(beats.slice(i, i + 2).join(' '));
+    lyrics.push(beatWords.slice(i, i + 2).join(' '));
+  }
+  return { bars, lyrics };
+}
+
+/**
+ * 唐船ドーイ（沖縄民謡）本調子。
+ * 音の順番は伊禮俊一さんのブログ「沖縄民謡No.54 唐船どーい」の工工四（本調子）を参考にした。
+ * 元の工工四にはリズム（マス目）が無いので、リズムは仮（2拍子・1拍に2音）。前奏と1番。
+ */
+export function createToshinDoiScore(): KunkunshiScore {
+  const { bars, lyrics } = eighthPhrasesToBars([
+    { notes: '工五七四' },
+    { notes: '工五七四' },
+    { notes: '工五七四七四七四' },
+    { notes: '工五七四' },
+    { notes: '工五七四' },
+    { notes: '工五七四七四七四七' },
+    { notes: '四七四七四七四七', words: 'とーしんどーい' },
+    { notes: '四七四七五七工五', words: 'さんてーまん' },
+    { notes: '尺老尺老工老工老', words: 'いっさんはーえー' },
+    { notes: '五老五老工老工五', words: 'ならんしや' },
+    { notes: '工五尺工上老四工', words: 'ゆいやなー' },
+    { notes: '老四上老尺老上老上', words: 'わかさ' },
+    { notes: '老尺老工老七五七工老工五', words: 'まちむら' },
+    { notes: '工尺上老', words: 'ぬー（さー）' },
+    { notes: '尺老工老工', words: 'しなふぁぬ' },
+    { notes: '老上尺四老四乙合上合', words: 'たんめー' },
+    { notes: '老五老工老工五工', words: 'はいやせんする' },
+    { notes: '老四乙合老', words: 'ゆいやなー' },
+    { notes: '工五七四 工五七四 工五', words: 'いやさっさっさっさ' },
+    { notes: '七四七四七四' }
+  ]);
+  const s = buildScore(
+    { id: 'toshin-doi', title: '唐船ドーイ', subtitle: '沖縄民謡', composer: '', tempo: 132, beatsPerMeasure: 2 },
+    bars,
+    lyrics
+  );
+  s.view.perLine = 6;
+  return s;
+}
+
+/**
+ * 谷茶前節（沖縄民謡）本調子。
+ * 音の順番は伊禮俊一さんのブログ「沖縄民謡No.32 谷茶前節」の工工四（本調子）を参考にした。
+ * 元の工工四にはリズム（マス目）が無いので、リズムは仮（2拍子・1拍に2音）。前奏と1番。
+ */
+export function createTanchameScore(): KunkunshiScore {
+  const { bars, lyrics } = eighthPhrasesToBars([
+    { notes: '四中五中工上四五四 七五七工中四五' },
+    { notes: '四中五中工上四五四 七五七工中四五四' },
+    { notes: '中五中七中五中七中五中七中七四八', words: 'たんちゃめーぬはまに' },
+    { notes: '中五中七四八中五中五中五中七八五七工五中七四五', words: 'スルルぐぁがゆてぃてぃんどーへイ' },
+    { notes: '中工中工五中七四 中五中七八五七工五中七四', words: 'スルルぐぁがゆてぃてぃんどーへイ' },
+    { notes: '五四中工上四五四 七五七工中四五' },
+    { notes: '四中五中工上四五四 七五七工中四五四' }
+  ]);
+  const s = buildScore(
+    { id: 'tanchame', title: '谷茶前節', subtitle: '沖縄民謡', composer: '', tempo: 132, beatsPerMeasure: 2 },
+    bars,
+    lyrics
+  );
+  s.view.perLine = 6;
+  return s;
+}
+
 export const PRESET_SONGS: PresetSongInfo[] = [
   {
     id: 'tinsagu',
@@ -236,6 +338,24 @@ export const PRESET_SONGS: PresetSongInfo[] = [
     description: '「マタハーリヌ ツィンダラ カヌシャマヨ」の囃子でおなじみ。2拍子で、1マスに2つの音が入る練習に。工工四は伊禮俊一さんのブログを参考にしました。',
     tuningName: '4本 本調子',
     score: createAsadoyaScore
+  },
+  {
+    id: 'toshin-doi',
+    title: '唐船ドーイ',
+    subtitle: '沖縄民謡',
+    composer: '',
+    description: '船が着いた喜びを歌う、カチャーシーの定番。前奏と1番。音の順番は伊禮俊一さんのブログを参考にし、リズムは仮（2拍子・1拍に2音）です。',
+    tuningName: '4本 本調子',
+    score: createToshinDoiScore
+  },
+  {
+    id: 'tanchame',
+    title: '谷茶前節',
+    subtitle: '沖縄民謡',
+    composer: '',
+    description: '谷茶の浜の漁のにぎわいを歌う、踊りの定番曲。前奏と1番。音の順番は伊禮俊一さんのブログを参考にし、リズムは仮（2拍子・1拍に2音）です。',
+    tuningName: '4本 本調子',
+    score: createTanchameScore
   },
   {
     id: 'ryukyu-etude',
