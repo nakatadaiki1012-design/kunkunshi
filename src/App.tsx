@@ -33,6 +33,8 @@ import { sanshinSynth } from './audio/sanshinSynth';
 import { ScorePlayer, PlayerSettings, previewSlot as previewSlotAudio } from './audio/player';
 import { slotOffsetInBeat, resolveSlot } from './audio/timeline';
 import { choosePosition } from './utils/fingering.js';
+import { midiToPosition } from './utils/staff';
+import { ScoreSheetStaff } from './components/ScoreSheetStaff';
 import { Header } from './components/Header';
 import { Dock } from './components/Dock';
 import { MeasureNavigator } from './components/MeasureNavigator';
@@ -580,18 +582,21 @@ export default function App() {
 
   // Note entry: Pluck string and input into current slot
   const inputString = useCallback(
-    (stringIndex: number, forceChord?: boolean) => {
+    (stringIndex: number, forceChord?: boolean, opts?: { at?: { m: number; b: number; s: number }; oshi?: number }) => {
       const sc = scoreRef.current;
       if (stringIndex < 0 || stringIndex >= POSITION_COUNT) return;
       const pitches = getPitches(sc);
-      sanshinSynth.pluck(KANDOKORO[stringIndex].str, pitches[stringIndex], 0, 0.85);
+      const accOff = opts?.oshi === 1 ? 1 : opts?.oshi === 2 ? -1 : 0;
+      sanshinSynth.pluck(KANDOKORO[stringIndex].str, pitches[stringIndex] + accOff, 0, 0.85);
 
       const chord = forceChord !== undefined ? forceChord : isChordMode;
 
       mutateScore(draft => {
-        const m = cursor.m;
-        const b = cursor.b;
-        let s = cursor.s;
+        // 五線譜でクリックした時は、そのマスへ入れる
+        const at = opts?.at;
+        const m = at ? at.m : cursor.m;
+        const b = at ? at.b : cursor.b;
+        let s = at ? at.s : cursor.s;
 
         while (m >= draft.measures.length) {
           draft.measures.push(createNewMeasure(draft.beatsPerMeasure));
@@ -600,7 +605,7 @@ export default function App() {
         const beat = draft.measures[m].beats[b];
         if (!beat) return;
 
-        if (cursor.low && beat.div === 1) {
+        if (!at && cursor.low && beat.div === 1) {
           beat.div = 2;
           beat.slots = [beat.slots[0], createNewSlot()];
           s = 1;
@@ -639,6 +644,7 @@ export default function App() {
           }
         } else {
           slot.notes = [stringIndex];
+          if (opts?.oshi !== undefined) slot.oshi = opts.oshi;
         }
 
         setLastEnteredSlot({ m, b, s });
@@ -646,6 +652,19 @@ export default function App() {
       });
     },
     [cursor, inputDiv, isChordMode, mutateScore]
+  );
+
+  // 五線譜：クリックした高さの音を、その勘所でマスへ入れる
+  const handleStaffInput = useCallback(
+    (m: number, b: number, s: number, midi: number) => {
+      const hit = midiToPosition(midi, getPitches(scoreRef.current));
+      if (!hit) {
+        showToast('三線の音域の外です（♯・♭や高さを変えてください）');
+        return;
+      }
+      inputString(hit.pos, false, { at: { m, b, s }, oshi: hit.oshi });
+    },
+    [inputString, showToast]
   );
 
   // Set note duration / beat division for current beat (splits or merges cell)
@@ -1665,6 +1684,20 @@ export default function App() {
                   if (a != null && b != null) setLoopRange([a, b]);
                 }}
                 autoScroll={true}
+              />
+            </div>
+          ) : score.view.layout === 'staff' ? (
+            <div className="w-full max-w-5xl mx-auto flex justify-center">
+              <ScoreSheetStaff
+                score={score}
+                cursor={isPrinting ? NO_CURSOR : cursor}
+                currentPlayKey={isPrinting ? null : currentPlayKey}
+                selectedSlotKeys={isPrinting ? NO_KEYS : selectedSlotKeys}
+                onSlotClick={handleSlotClick}
+                onMeasureClick={handleMeasureClick}
+                onStaffInput={handleStaffInput}
+                onAddMeasure={handleAddMeasure}
+                readOnly={isPrinting}
               />
             </div>
           ) : (

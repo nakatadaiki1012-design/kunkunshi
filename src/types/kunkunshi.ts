@@ -204,8 +204,8 @@ export interface TuningConfig {
   custom: number[] | null;
 }
 
-/** 楽譜の形：'vertical' = 作文用紙のような縦書きの工工四、'tab' = 3本線のタブ譜 */
-export type ScoreLayout = 'vertical' | 'tab';
+/** 楽譜の形：'vertical' = 作文用紙のような縦書きの工工四、'tab' = 3本線のタブ譜、'staff' = 五線譜 */
+export type ScoreLayout = 'vertical' | 'tab' | 'staff';
 
 export interface ViewSettings {
   ruby: 'off' | 'doremi' | 'cde';
@@ -371,7 +371,7 @@ export function normalizeScore(raw: any, fallback?: KunkunshiScore): KunkunshiSc
   const v = raw.view || {};
   const view: ViewSettings = {
     ruby: ['off', 'doremi', 'cde'].includes(v.ruby) ? v.ruby : 'off',
-    layout: v.layout === 'tab' || v.layout === 'horizontal' ? 'tab' : 'vertical',
+    layout: v.layout === 'tab' || v.layout === 'horizontal' ? 'tab' : v.layout === 'staff' ? 'staff' : 'vertical',
     paper: v.paper === 'landscape' ? 'landscape' : 'portrait',
     chart: v.chart === 'off' ? 'off' : 'on',
     perLine: typeof v.perLine === 'number' && v.perLine > 0 ? clamp(Math.round(v.perLine), 1, 8) : 3,

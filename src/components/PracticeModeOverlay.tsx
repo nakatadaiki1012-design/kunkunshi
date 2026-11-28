@@ -11,6 +11,7 @@ import {
 } from '../types/kunkunshi';
 import { ScoreSheetVertical } from './ScoreSheetVertical';
 import { ScoreSheetTab } from './ScoreSheetTab';
+import { ScoreSheetStaff } from './ScoreSheetStaff';
 import {
   Play,
   Pause,
@@ -204,6 +205,15 @@ export const PracticeModeOverlay: React.FC<PracticeModeOverlayProps> = ({
               onMeasureClick={onSelectMeasure}
               onUpdateScoreMeta={onUpdateScoreMeta}
               autoScroll={true}
+            />
+          ) : score.view.layout === 'staff' ? (
+            <ScoreSheetStaff
+              score={scoreWithZoom}
+              cursor={cursor}
+              currentPlayKey={currentPlayKey}
+              onSlotClick={(m, b, s, low) => onSlotClick(m, b, s, low)}
+              onMeasureClick={onSelectMeasure}
+              readOnly
             />
           ) : (
             <ScoreSheetTab

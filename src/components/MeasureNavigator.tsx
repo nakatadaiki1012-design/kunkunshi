@@ -18,7 +18,7 @@ interface MeasureNavigatorProps {
   totalMeasures: number;
   currentMeasure: number;
   perLine: number;
-  layout: 'vertical' | 'tab';
+  layout: 'vertical' | 'tab' | 'staff';
   zoom: number;
   isFitAll: boolean;
   onSelectMeasure: (mIdx: number) => void;

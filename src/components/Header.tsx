@@ -118,6 +118,15 @@ export const Header: React.FC<HeaderProps> = ({
           >
             タブ譜
           </button>
+          <button
+            onClick={() => onUpdateView({ layout: 'staff' })}
+            className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              view.layout === 'staff' ? 'bg-white text-stone-900 shadow-2xs font-bold' : 'text-stone-500 hover:text-stone-900'
+            }`}
+            title="五線譜（ト音記号の下に8）。五線の上をクリックして音を入れられます"
+          >
+            五線譜
+          </button>
         </div>
 
         {/* Modal & Options Buttons */}
