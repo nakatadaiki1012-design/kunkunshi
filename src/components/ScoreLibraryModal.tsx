@@ -5,9 +5,9 @@
 
 import { useModal } from '../hooks/useModal';
 import React, { useState, useEffect } from 'react';
-import { KunkunshiScore, createEmptyScore, TUNING_PRESETS } from '../types/kunkunshi';
+import { KunkunshiScore, createEmptyScore, TUNING_PRESETS, normalizeScore } from '../types/kunkunshi';
 import { PRESET_SONGS, PresetSongInfo } from '../data/presetScores';
-import { BookOpen, FolderHeart, Plus, Copy, Trash2, ArrowRight } from 'lucide-react';
+import { BookOpen, FolderHeart, Plus, Copy, Trash2, ArrowRight, FileUp } from 'lucide-react';
 
 interface ScoreLibraryModalProps {
   score: KunkunshiScore;
@@ -82,6 +82,34 @@ export const ScoreLibraryModal: React.FC<ScoreLibraryModalProps> = ({
     }
   };
 
+  // 譜面ファイル（JSON）を、このブラウザの楽曲集に追加する（何曲でもまとめて選べる）
+  const handleAddFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    const added: KunkunshiScore[] = [];
+    const failed: string[] = [];
+    for (const [i, f] of files.entries()) {
+      try {
+        const parsed = JSON.parse(await f.text());
+        if (!parsed || !Array.isArray(parsed.measures)) throw new Error();
+        const sc = normalizeScore(parsed);
+        added.push({ ...sc, title: sc.title || f.name.replace(/\.json$/i, ''), id: `score_${Date.now()}_${i}`, updatedAt: Date.now() });
+      } catch {
+        failed.push(f.name);
+      }
+    }
+    if (added.length) {
+      // 同じ曲名がすでにあれば置き換える
+      const titles = new Set(added.map(a => a.title));
+      persistScores([...added, ...savedScores.filter(s => !titles.has(s.title))]);
+    }
+    alert(
+      (added.length ? `${added.length}曲を楽曲集に追加しました：${added.map(a => `「${a.title}」`).join('')}` : '') +
+        (failed.length ? `\n読み込めなかったファイル：${failed.join('、')}（工工四エディタの譜面ファイル(.json)を選んでください）` : '')
+    );
+  };
+
   const handleDeleteSaved = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('この保存譜面を削除しますか？')) return;
@@ -152,16 +180,23 @@ export const ScoreLibraryModal: React.FC<ScoreLibraryModalProps> = ({
             >
               <FolderHeart className="h-3.5 w-3.5 text-indigo-700" /> 現在の譜面をマイ保存に追加
             </button>
+            <label
+              className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-950 hover:bg-emerald-100 cursor-pointer"
+              title="譜面ファイル（.json）を選ぶと、このブラウザの楽曲集に入ります（ネットには公開されません）"
+            >
+              <FileUp className="h-3.5 w-3.5 text-emerald-700" /> ファイルから楽曲集に追加
+              <input type="file" accept=".json,application/json" multiple className="hidden" onChange={handleAddFiles} />
+            </label>
           </div>
 
           {/* Saved Scores in LocalStorage */}
           <div>
             <h3 className="text-xs font-bold text-stone-700 flex items-center gap-1.5 mb-2.5">
-              <FolderHeart className="h-4 w-4 text-stone-600" /> ブラウザ保存済み譜面 ({savedScores.length})
+              <FolderHeart className="h-4 w-4 text-stone-600" /> 自分の楽曲集（このブラウザだけ） ({savedScores.length})
             </h3>
             {savedScores.length === 0 ? (
               <div className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-xs text-stone-500">
-                まだブラウザに保存された譜面はありません。「現在の譜面をマイ保存に追加」ボタンでいつでも保存できます。
+                まだありません。「現在の譜面をマイ保存に追加」や「ファイルから楽曲集に追加」で入れられます。ここに入れた曲は、このブラウザの中だけに保存され、ネットには公開されません。
               </div>
             ) : (
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
