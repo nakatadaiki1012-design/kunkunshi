@@ -35,6 +35,7 @@ import { slotOffsetInBeat, resolveSlot } from './audio/timeline';
 import { choosePosition } from './utils/fingering.js';
 import { midiToPosition } from './utils/staff';
 import { ScoreSheetStaff } from './components/ScoreSheetStaff';
+import { Splitter } from './components/Splitter';
 import { Header } from './components/Header';
 import { Dock } from './components/Dock';
 import { MeasureNavigator } from './components/MeasureNavigator';
@@ -154,6 +155,35 @@ export default function App() {
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [isNewScoreWizardOpen, setIsNewScoreWizardOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  // 上下の場所の高さ（つまみで変える。null = 中身に合わせる）。次に開いた時も同じ高さ
+  const topPaneRef = useRef<HTMLDivElement>(null);
+  const bottomPaneRef = useRef<HTMLDivElement>(null);
+  const readPaneH = (k: string) => {
+    try {
+      const v = localStorage.getItem(k);
+      return v ? Number(v) || null : null;
+    } catch {
+      return null;
+    }
+  };
+  const [topPaneH, setTopPaneHState] = useState<number | null>(() => readPaneH('kunkunshi.topPaneH'));
+  const [bottomPaneH, setBottomPaneHState] = useState<number | null>(() => readPaneH('kunkunshi.bottomPaneH'));
+  const savePaneH = (k: string, h: number | null) => {
+    try {
+      if (h == null) localStorage.removeItem(k);
+      else localStorage.setItem(k, String(h));
+    } catch {
+      /* 保存できなくても動く */
+    }
+  };
+  const setTopPaneH = useCallback((h: number | null) => {
+    setTopPaneHState(h);
+    savePaneH('kunkunshi.topPaneH', h);
+  }, []);
+  const setBottomPaneH = useCallback((h: number | null) => {
+    setBottomPaneHState(h);
+    savePaneH('kunkunshi.bottomPaneH', h);
+  }, []);
   const [viewportW, setViewportW] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth));
   useEffect(() => {
     const onResize = () => setViewportW(window.innerWidth);
@@ -1633,6 +1663,12 @@ export default function App() {
     <div className="h-dvh overflow-y-auto okinawa-bg print:h-auto print:overflow-visible print:bg-white text-stone-900 flex flex-col font-sans">
       {/* Container */}
       <div className="w-full max-w-[1360px] 2xl:max-w-[1760px] mx-auto flex-1 min-h-0 p-1.5 sm:p-3 short:p-1 print:p-0 print:m-0 print:max-w-none flex flex-col gap-1.5 sm:gap-2 short:gap-1">
+        {/* 上の場所（見出し・小節の一覧）。下のつまみで高さを変えられる */}
+        <div
+          ref={topPaneRef}
+          className="shrink-0 flex flex-col gap-1.5 sm:gap-2 short:gap-1 overflow-y-auto overscroll-contain rounded-xl print:overflow-visible"
+          style={topPaneH != null && !isPrinting ? { height: topPaneH } : undefined}
+        >
         {/* Header (Top app bar with title, actions, and collapsible settings) */}
         <Header
           score={score}
@@ -1661,6 +1697,8 @@ export default function App() {
           onToggleFitAll={handleToggleFitAll}
           onSetZoom100={handleSetZoom100}
         />
+        </div>
+        <Splitter target={topPaneRef} side="top" min={30} onChange={setTopPaneH} label="上の場所の高さ" />
 
         {/* Main Bunkafu Score Paper Sheet (Continuous horizontal flow, centered in viewport) */}
         <main
@@ -1739,6 +1777,20 @@ export default function App() {
           )}
         </main>
 
+        <Splitter
+          target={bottomPaneRef}
+          side="bottom"
+          min={44}
+          max={() => window.innerHeight - 160}
+          onChange={setBottomPaneH}
+          label="入力パネルの高さ"
+        />
+        {/* 下の場所（仮想三線と入力パネル）。上のつまみで高さを変えられる */}
+        <div
+          ref={bottomPaneRef}
+          className="no-print shrink-0 flex flex-col gap-1.5 sm:gap-2 short:gap-1 overflow-y-auto overscroll-contain rounded-xl"
+          style={bottomPaneH != null ? { height: bottomPaneH } : undefined}
+        >
         {/* 仮想三線（入力パネルの上に表示） */}
         {score.view.showSanshinBoard && (
           <div className="no-print shrink-0">
@@ -1819,6 +1871,7 @@ export default function App() {
             onTempoChange={bpm => handleUpdateMeta({ tempo: bpm })}
             onToggleSanshinBoard={() => mutateScore(d => { d.view.showSanshinBoard = !d.view.showSanshinBoard; }, { history: false })}
           />
+        </div>
         </div>
 
       </div>
