@@ -159,7 +159,7 @@ export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({
 
       {!isCollapsed && (
         <div className="overflow-x-auto">
-          <svg viewBox={`0 0 ${W} ${H}`} className="block w-full min-w-[560px]" role="img" aria-label="三線の棹と勘所">
+          <svg viewBox={`0 0 ${W} ${H}`} className="block w-full min-w-[560px] max-h-[26dvh]" role="img" aria-label="三線の棹と勘所">
             <defs>
               <linearGradient id="vs-neck" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0" stopColor="#3a3632" />
@@ -308,7 +308,7 @@ export const VirtualSanshin: React.FC<VirtualSanshinProps> = ({
               {mirror ? '← 胴の方' : '胴の方 →'}
             </text>
           </svg>
-          <p className="mt-1 text-[10px] text-stone-400">
+          <p className="mt-1 text-[10px] text-stone-400 hidden lg:block short:!hidden">
             上から 男弦・中弦・女弦。光っている所が、いまの音で押さえる場所です（色は指：
             <span style={{ color: FINGER_COLORS[1] }}>●人差指</span> <span style={{ color: FINGER_COLORS[2] }}>●中指</span>{' '}
             <span style={{ color: FINGER_COLORS[4] }}>●小指</span>、水色の弦は開放）。勘所の間隔は本物の三線と同じ比率です。押すと音が鳴って入力されます。

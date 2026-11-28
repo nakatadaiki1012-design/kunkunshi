@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="flex flex-col gap-1.5 overflow-hidden rounded-xl border border-indigo-900/20 bg-stone-50/95 px-2.5 sm:px-3 pb-1 sm:pb-1.5 shadow-sm backdrop-blur-md no-print transition-all">
+    <header className="shrink-0 flex flex-col gap-1.5 short:gap-0.5 overflow-hidden rounded-xl border border-indigo-900/20 bg-stone-50/95 px-2.5 sm:px-3 pb-1 sm:pb-1.5 shadow-sm backdrop-blur-md no-print transition-all">
       {/* ミンサー織の帯（五つと四つの絣） */}
       <div className="minsa-band -mx-2.5 sm:-mx-3" aria-hidden="true" />
       {/* Top row: Brand & Primary Modals */}
@@ -90,9 +90,9 @@ export const Header: React.FC<HeaderProps> = ({
               value={score.title}
               onChange={e => onUpdateScoreMeta({ title: e.target.value })}
               placeholder="曲名を入力"
-              className="font-score font-extrabold text-xs sm:text-sm text-stone-900 border-b border-transparent hover:border-stone-300 focus:border-indigo-500 focus:outline-none bg-transparent max-w-[110px] sm:max-w-[200px] py-0.5"
+              className="font-score font-extrabold text-xs sm:text-sm text-stone-900 border-b border-transparent hover:border-stone-300 focus:border-indigo-500 focus:outline-none bg-transparent max-w-[96px] sm:max-w-[200px] short:max-w-[130px] py-0.5"
             />
-            <span className="rounded bg-amber-100/80 px-1 py-0.2 font-mono text-[9px] font-bold text-amber-900 shrink-0">
+            <span className="hidden sm:inline short:!hidden rounded bg-amber-100/80 px-1 py-0.2 font-mono text-[9px] font-bold text-amber-900 shrink-0">
               {score.tuning.preset === 'custom' ? 'カスタム' : `${honOfRoot(score.tuning.root)} ${TUNING_PRESETS[score.tuning.preset]?.name || ''}`}
             </span>
           </div>
@@ -102,30 +102,33 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="inline-flex rounded-lg border border-stone-300 bg-stone-100 p-0.5 shrink-0" role="group" aria-label="楽譜の形">
           <button
             onClick={() => onUpdateView({ layout: 'vertical' })}
+            aria-label="縦書き工工四"
             className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
               view.layout === 'vertical' ? 'bg-white text-stone-900 shadow-2xs font-bold' : 'text-stone-500 hover:text-stone-900'
             }`}
             title="昔からの工工四（作文用紙のようなマス目・縦書き・右から左へ）"
           >
-            縦書き工工四
+            縦書き<span className="hidden sm:inline short:!hidden">工工四</span>
           </button>
           <button
             onClick={() => onUpdateView({ layout: 'tab' })}
+            aria-label="タブ譜"
             className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
               view.layout === 'tab' ? 'bg-white text-stone-900 shadow-2xs font-bold' : 'text-stone-500 hover:text-stone-900'
             }`}
             title="3本の線（上から 女弦・中弦・男弦）に勘所を書くタブ譜（横書き・左から右へ）"
           >
-            タブ譜
+            タブ<span className="hidden sm:inline short:!hidden">譜</span>
           </button>
           <button
             onClick={() => onUpdateView({ layout: 'staff' })}
+            aria-label="五線譜"
             className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
               view.layout === 'staff' ? 'bg-white text-stone-900 shadow-2xs font-bold' : 'text-stone-500 hover:text-stone-900'
             }`}
             title="五線譜（ト音記号の下に8）。五線の上をクリックして音を入れられます"
           >
-            五線譜
+            五線<span className="hidden sm:inline short:!hidden">譜</span>
           </button>
         </div>
 
@@ -139,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="空白の楽譜を新しく作成する (Ctrl+N)"
             >
               <FilePlus className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-700 shrink-0" />
-              <span className="hidden sm:inline">新規楽譜</span>
+              <span className="hidden sm:inline short:!hidden">新規楽譜</span>
             </button>
           )}
 
@@ -150,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="楽曲ライブラリ"
           >
             <FolderOpen className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-700 shrink-0" />
-            <span className="hidden sm:inline">楽曲集</span>
+            <span className="hidden sm:inline short:!hidden">楽曲集</span>
           </button>
 
           <button
@@ -160,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="調弦設定"
           >
             <Sliders className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-700 shrink-0" />
-            <span className="hidden sm:inline">調弦</span>
+            <span className="hidden sm:inline short:!hidden">調弦</span>
           </button>
 
           {onOpenPracticeMode && (
@@ -191,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="印刷画面・PDF保存プレビューを開く (Ctrl+P)"
             >
               <Printer className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-stone-700 shrink-0" />
-              <span className="hidden sm:inline">印刷</span>
+              <span className="hidden sm:inline short:!hidden">印刷</span>
             </button>
           )}
 
@@ -207,7 +210,7 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="表示設定・詳細切り替え"
           >
             <Settings2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-            <span className="hidden md:inline">設定</span>
+            <span className="hidden md:inline short:!hidden">設定</span>
             {showOptions ? <ChevronUp className="h-2.5 w-2.5 shrink-0" /> : <ChevronDown className="h-2.5 w-2.5 shrink-0" />}
           </button>
 
@@ -405,7 +408,7 @@ export const Header: React.FC<HeaderProps> = ({
                     ? 'border-amber-400 bg-amber-50 text-amber-900 font-bold'
                     : 'border-stone-200 bg-white text-stone-500 hover:text-stone-800'
                 }`}
-                title="ページ最下部に三線の棹（勘所）を表示・非表示"
+                title="入力パネルの上に三線の棹（勘所）を表示・非表示"
               >
                 <Music className="h-3 w-3" />
                 <span>仮想三線</span>

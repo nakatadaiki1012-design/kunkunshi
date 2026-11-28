@@ -364,8 +364,8 @@ export const Dock: React.FC<DockProps> = ({
           </div>
         </div>
 
-        {/* Center: Note Duration Pickers & Rest/Tie */}
-        <div className="flex items-center gap-0.5 sm:gap-1">
+        {/* Center: Note Duration Pickers & Rest/Tie（スマホでは下の行に1列で） */}
+        <div className="order-last sm:order-none w-full sm:w-auto flex items-center justify-between sm:justify-start gap-0.5 sm:gap-1">
           {[
             { div: 1, label: '♩', title: '4分音符 (1拍1音 / Qキー)' },
             { div: 2, label: '♪♪', title: '8分音符 (1拍を2音に等分 / Wキー)' },
@@ -466,7 +466,7 @@ export const Dock: React.FC<DockProps> = ({
 
       {/* Expanded Tab Body */}
       {isExpanded && (
-        <div className="p-1 sm:p-2">
+        <div className="p-1 sm:p-2 short:p-0.5 max-h-[52dvh] overflow-y-auto">
           {/* TAB 1: 勘所キー（合〜九） */}
           {activeTab === 'strings' && (
             <div className="flex flex-col gap-1">
@@ -588,9 +588,9 @@ export const Dock: React.FC<DockProps> = ({
                           ? 'bg-amber-100 text-amber-900 border-amber-400 font-bold'
                           : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
                       }`}
-                      title="ページ最下部に三線の棹（勘所）を表示・非表示"
+                      title="入力パネルの上に三線の棹（勘所）を表示・非表示"
                     >
-                      仮想三線 {score.view.showSanshinBoard ? '表示中 (最下部)' : '非表示'}
+                      仮想三線 {score.view.showSanshinBoard ? '表示中' : '非表示'}
                     </button>
                   )}
                   <span className="text-[10px] text-stone-400 hidden sm:inline">

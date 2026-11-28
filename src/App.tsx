@@ -154,6 +154,12 @@ export default function App() {
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [isNewScoreWizardOpen, setIsNewScoreWizardOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [viewportW, setViewportW] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth));
+  useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     // ブラウザのメニューや Ctrl+P からの印刷でも、印刷用の見た目に切り替える
@@ -1619,10 +1625,14 @@ export default function App() {
     currentOrns[k] = !!targetSlot?.[k];
   });
 
+  // 横書き（タブ譜・五線譜）は、せまい画面では1行の小節数を減らして字が重ならないようにする
+  const maxPerLine = viewportW < 520 ? 2 : viewportW < 820 ? 3 : 99;
+  const lineScore = score.view.perLine > maxPerLine ? { ...score, view: { ...score.view, perLine: maxPerLine } } : score;
+
   return (
-    <div className="min-h-screen okinawa-bg print:bg-white print:min-h-0 text-stone-900 flex flex-col font-sans">
+    <div className="h-dvh overflow-y-auto okinawa-bg print:h-auto print:overflow-visible print:bg-white text-stone-900 flex flex-col font-sans">
       {/* Container */}
-      <div className="w-full max-w-[1360px] mx-auto p-2 sm:p-3 print:p-0 print:m-0 print:max-w-none flex flex-col gap-2">
+      <div className="w-full max-w-[1360px] 2xl:max-w-[1760px] mx-auto flex-1 min-h-0 p-1.5 sm:p-3 short:p-1 print:p-0 print:m-0 print:max-w-none flex flex-col gap-1.5 sm:gap-2 short:gap-1">
         {/* Header (Top app bar with title, actions, and collapsible settings) */}
         <Header
           score={score}
@@ -1658,7 +1668,7 @@ export default function App() {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className="paper-okinawa w-full rounded-2xl border border-stone-300 p-3 sm:p-6 pt-4 sm:pt-7 shadow-md overflow-x-auto overflow-y-auto max-h-[68vh] print:max-h-none print:border-none print:shadow-none print:p-0 print:bg-white touch-pan-x touch-pan-y flex justify-center items-start"
+          className="paper-okinawa w-full rounded-2xl border border-stone-300 p-2 sm:p-6 pt-3 sm:pt-7 shadow-md overflow-x-auto overflow-y-auto flex-1 h-0 min-h-[110px] print:h-auto short:p-2 print:max-h-none print:border-none print:shadow-none print:p-0 print:bg-white touch-pan-x touch-pan-y flex justify-center-safe items-start"
         >
           {score.view.layout === 'vertical' ? (
             <div className="min-w-fit mx-auto flex justify-center print:min-w-0 print:w-full">
@@ -1687,9 +1697,9 @@ export default function App() {
               />
             </div>
           ) : score.view.layout === 'staff' ? (
-            <div className="w-full max-w-5xl mx-auto flex justify-center">
+            <div className="w-full max-w-5xl 2xl:max-w-7xl mx-auto flex justify-center">
               <ScoreSheetStaff
-                score={score}
+                score={isPrinting ? score : lineScore}
                 cursor={isPrinting ? NO_CURSOR : cursor}
                 currentPlayKey={isPrinting ? null : currentPlayKey}
                 selectedSlotKeys={isPrinting ? NO_KEYS : selectedSlotKeys}
@@ -1701,9 +1711,9 @@ export default function App() {
               />
             </div>
           ) : (
-            <div className="w-full max-w-5xl mx-auto flex justify-center">
+            <div className="w-full max-w-5xl 2xl:max-w-7xl mx-auto flex justify-center">
               <ScoreSheetTab
-                score={score}
+                score={isPrinting ? score : lineScore}
                 cursor={isPrinting ? NO_CURSOR : cursor}
                 currentPlayKey={isPrinting ? null : currentPlayKey}
                 selectedRange={isPrinting ? null : selectedRange}
@@ -1729,8 +1739,24 @@ export default function App() {
           )}
         </main>
 
+        {/* 仮想三線（入力パネルの上に表示） */}
+        {score.view.showSanshinBoard && (
+          <div className="no-print shrink-0">
+            <VirtualSanshin
+              score={score}
+              onSelectString={inputString}
+              activeStrings={handSlot?.notes || []}
+              activeOshi={handSlot?.oshi || 0}
+              playing={isPlaying}
+              handPosition={handPosition}
+              activeFinger={handSlot?.finger}
+              noteEvent={currentPlayKey || (lastEnteredSlot ? `${lastEnteredSlot.m}-${lastEnteredSlot.b}-${lastEnteredSlot.s}:${historyVersion}` : '')}
+              onClose={() => mutateScore(d => (d.view.showSanshinBoard = false), { history: false })}
+            />
+          </div>
+        )}
         {/* Dock Controls (Input pad, tabs, playback, thumb-friendly navigation) */}
-        <div className="sticky bottom-1 z-30 no-print">
+        <div className="shrink-0 z-30 no-print">
           <Dock
             score={score}
             currentCursor={{ m: cursor.m, b: cursor.b, s: cursor.s }}
@@ -1795,22 +1821,6 @@ export default function App() {
           />
         </div>
 
-        {/* 仮想三線（いちばん下に表示） */}
-        {score.view.showSanshinBoard && (
-          <div className="no-print mt-1 pb-4">
-            <VirtualSanshin
-              score={score}
-              onSelectString={inputString}
-              activeStrings={handSlot?.notes || []}
-              activeOshi={handSlot?.oshi || 0}
-              playing={isPlaying}
-              handPosition={handPosition}
-              activeFinger={handSlot?.finger}
-              noteEvent={currentPlayKey || (lastEnteredSlot ? `${lastEnteredSlot.m}-${lastEnteredSlot.b}-${lastEnteredSlot.s}:${historyVersion}` : '')}
-              onClose={() => mutateScore(d => (d.view.showSanshinBoard = false), { history: false })}
-            />
-          </div>
-        )}
       </div>
 
       {/* Excel-like Multi-Cell Selection Floating Action Bar (Only shown when 2 or more cells are selected) */}

@@ -362,7 +362,7 @@ export const ScoreSheetStaff: React.FC<ScoreSheetStaffProps> = ({
   };
 
   return (
-    <div data-layout="staff" className="relative w-full max-w-5xl mx-auto flex flex-col gap-3 select-none text-stone-900 pb-6" style={{ zoom: score.view.zoom }}>
+    <div data-layout="staff" className="relative w-full max-w-5xl 2xl:max-w-7xl mx-auto flex flex-col gap-3 select-none text-stone-900 pb-6" style={{ zoom: score.view.zoom }}>
       {/* 題名 */}
       <div className="flex flex-col items-center border-b border-stone-300 pb-3 text-center">
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-widest font-score">{score.title || '無題'}</h1>

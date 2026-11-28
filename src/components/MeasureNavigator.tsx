@@ -56,7 +56,7 @@ export const MeasureNavigator: React.FC<MeasureNavigatorProps> = ({
   }, [currentMeasure]);
 
   return (
-    <div className="flex items-center justify-between gap-1.5 rounded-lg border border-stone-200/90 bg-white/95 px-2 py-0.5 shadow-2xs backdrop-blur-xs no-print text-xs transition-all h-8">
+    <div className="shrink-0 short:hidden flex items-center justify-between gap-1.5 rounded-lg border border-stone-200/90 bg-white/95 px-2 py-0.5 shadow-2xs backdrop-blur-xs no-print text-xs transition-all h-8">
       {/* Quick Measure Jump Scrubber */}
       <div className="flex items-center gap-1 min-w-0 flex-1">
         <span className="font-semibold text-stone-400 shrink-0 text-[10px] hidden sm:inline">

@@ -7,6 +7,9 @@
  *  red    → 赤瓦・ハイビスカス（奏法記号）
  *  stone  → 砂浜とサンゴの白（紙・枠・文字）
  */
+/* 背の低い画面（スマホ横向きなど） */
+@custom-variant short (@media screen and (max-height: 520px));
+
 @theme {
   --color-indigo-50: #e9f7f9;
   --color-indigo-100: #ccedf2;

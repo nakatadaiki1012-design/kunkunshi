@@ -192,7 +192,7 @@ export const PracticeModeOverlay: React.FC<PracticeModeOverlayProps> = ({
       {/* Main Score Canvas (Maximized view, auto-scrolling) */}
       <div
         ref={containerRef}
-        className="flex-1 w-full overflow-x-auto overflow-y-auto p-2 sm:p-6 bg-[#fdfcf8] flex items-center justify-center"
+        className="flex-1 w-full overflow-x-auto overflow-y-auto p-2 sm:p-6 bg-[#fdfcf8] flex items-center-safe justify-center-safe"
       >
         <div className="max-w-[1400px] w-full bg-[#fdfcf8] rounded-xl p-2 sm:p-4 shadow-sm border border-stone-300/60">
           {score.view.layout === 'vertical' ? (

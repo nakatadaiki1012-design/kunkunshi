@@ -114,12 +114,18 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
     if (!autoScroll) return;
     const targetId = currentPlayKey ? `slot-${currentPlayKey}` : `measure-${cursor.m}`;
     const el = document.getElementById(targetId);
-    if (el) {
-      el.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-        inline: 'center'
-      });
+    if (!el) return;
+    if (currentPlayKey) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      return;
+    }
+    // 小節（縦に長い列）は、横だけ合わせる（上の「段」の見出しが隠れないように）
+    let box: HTMLElement | null = el.parentElement;
+    while (box && !(box.scrollWidth > box.clientWidth && /(auto|scroll)/.test(getComputedStyle(box).overflowX))) box = box.parentElement;
+    if (!box) return;
+    const r = el.getBoundingClientRect(), br = box.getBoundingClientRect();
+    if (r.left < br.left || r.right > br.right) {
+      box.scrollBy({ left: r.left + r.width / 2 - (br.left + br.width / 2), behavior: 'smooth' });
     }
   }, [cursor.m, currentPlayKey, autoScroll]);
 
@@ -300,7 +306,7 @@ export const ScoreSheetVertical: React.FC<ScoreSheetVerticalProps> = ({
 
         {/* Tuning Chart Table (調弦表) */}
         {score.view.chart === 'on' && (
-          <div className="mt-6 flex flex-col text-[11px] font-sans border border-stone-400/80 rounded bg-stone-50/80 p-1.5 shadow-xs max-w-[150px]">
+          <div className="mt-6 hidden sm:flex flex-col text-[11px] font-sans border border-stone-400/80 rounded bg-stone-50/80 p-1.5 shadow-xs max-w-[150px]">
             <div className="text-[10px] font-bold text-stone-700 mb-1 border-b border-stone-200 pb-0.5">
               {getTuningLabel(score)}
             </div>

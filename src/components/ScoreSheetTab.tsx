@@ -139,7 +139,7 @@ export const ScoreSheetTab: React.FC<ScoreSheetTabProps> = ({
       data-font={score.view.fontStyle || 'shippori'}
       data-layout="tab"
       style={{ zoom: score.view.zoom }}
-      className={`relative flex flex-col gap-6 select-none ${fontClass} text-stone-900 transition-all w-full max-w-5xl mx-auto pb-6`}
+      className={`relative flex flex-col gap-6 select-none ${fontClass} text-stone-900 transition-all w-full max-w-5xl 2xl:max-w-7xl mx-auto pb-6`}
     >
       {/* Header: Title, Subtitle, Composer */}
       <div className="flex flex-col items-center border-b border-stone-300 pb-4 text-center">
